@@ -638,13 +638,14 @@ void Logger::add_default_topics()
 	add_topic("mission_result",100);
 	//add_topic("optical_flow", 50);
 	add_topic("position_setpoint_triplet", 200);
+	add_topic("vehicle_control_mode", 0);
 	add_topic("radio_status");
 	add_topic("rate_ctrl_status", 100);
 	add_topic("sensor_combined");
 	add_topic("sensor_accel");
 	add_topic("sensor_preflight", 200);
 	add_topic("system_power", 500);
-	add_topic("tecs_status", 200);
+	add_topic("tecs_status", 0);
 	add_topic("trajectory_setpoint", 200);
 	add_topic("telemetry_status",20);
 	add_topic("vehicle_air_data", 200);

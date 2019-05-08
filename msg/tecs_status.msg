@@ -7,6 +7,7 @@ uint8 TECS_MODE_LAND_THROTTLELIM = 4
 uint8 TECS_MODE_BAD_DESCENT = 5
 uint8 TECS_MODE_CLIMBOUT = 6
 
+uint8 cur_mode
 
 float32 altitude_sp
 float32 altitude_filtered
