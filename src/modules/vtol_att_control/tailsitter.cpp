@@ -261,6 +261,7 @@ float Tailsitter::thr_from_acc_cmd(float vert_acc_cmd, float airspeed, float pit
 	float bx_acc_ki       = 0.002f;
 
 	float thrust_cmd      = 0.0f;
+	float cos_pitch       = 0.0f;
 
 	/* calculate the aerodynamic lift force */
 	//float CL_temp           = 0.0f;
@@ -283,7 +284,8 @@ float Tailsitter::thr_from_acc_cmd(float vert_acc_cmd, float airspeed, float pit
 		lift_weight_ratio = dyn_pressure * 1.0f * CL_temp * 0.5f/ (1.68f * 9.8f);
 		thrust_cmd        = (-_mc_hover_thrust - lift_weight_ratio * (-_mc_hover_thrust) + vert_acc_cmd / 9.8f * (-_mc_hover_thrust)) / cosf(pitch_ang);
 		 ***/
-		bx_acc_cmd    = (9.8f + _sensor_acc->z * sinf(pitch_ang) - vert_acc_cmd) / cosf(pitch_ang);
+		cos_pitch     = math::constrain(cosf(pitch_ang), 0.3f, 1.0f);
+		bx_acc_cmd    = (9.8f + _sensor_acc->z * sinf(pitch_ang) - vert_acc_cmd) / cos_pitch;
 		bx_acc_cmd    = math::constrain(bx_acc_cmd, -2.0f * 9.8f, 2.0f * 9.8f);
 		bx_acc_err    = bx_acc_cmd - _sensor_acc->x;
 		bx_acc_err_i  = _vtol_vehicle_status->bx_acc_i + bx_acc_ki * bx_acc_err * 0.004f;
@@ -514,6 +516,7 @@ void Tailsitter::fill_actuator_outputs()
 	float sweep_signal_phase = 0.0f;
 	float sweep_signal = 0.0f;
 	float smooth_fw_start = 0.0f;
+	float smooth_pr_start = 0.0f;
 	float sweep_min_frequency = 0.5f * 6.2831f;
 	float sweep_max_frequency = 80.0f * 6.2831f ;
 	float overall_time = 150.0f;
@@ -590,20 +593,39 @@ void Tailsitter::fill_actuator_outputs()
 		// at the start of the fw mode, the control output of pitch is smoothed from the end of transition
 		time_since_fw_start = (float)(hrt_absolute_time() - _vtol_schedule.fw_start) * 1e-6f;
 		smooth_fw_start = math::constrain(time_since_fw_start / 0.3f, 0.0f, 1.0f);
+		smooth_pr_start = math::constrain(time_since_fw_start / 1.5f, 0.0f, 1.0f);
 
-		if ((time_since_fw_start <= 0.02f) && (time_since_fw_start >= 0.0f)) {
-			time_since_fw_start = time_since_fw_start;
-		} else {
+		if (time_since_fw_start <= 0.05f)
+		{
+			_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] =
+			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE] * smooth_fw_start + 0.70f * (1.0f - smooth_fw_start);
+		}
+		else if (time_since_fw_start <= 1.5f)
+		{
 			_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] +  _params->fw_pitch_trim;
+				_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] * smooth_pr_start
+				+ _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] * (1 - smooth_pr_start)
+				+ _params->fw_pitch_trim;
+			_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] =
+				_actuators_fw_in->control[actuator_controls_s::INDEX_YAW] * smooth_pr_start
+				+ _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL] * (1 - smooth_pr_start);
+			_actuators_out_0->control[actuator_controls_s::INDEX_YAW] =
+				-_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL]  * smooth_pr_start
+				+ _actuators_mc_in->control[actuator_controls_s::INDEX_YAW] * (1 - smooth_pr_start);
+
+
+		} else{
+			_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] =
+				_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim;
+			_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] =
+				_actuators_fw_in->control[actuator_controls_s::INDEX_YAW];
+			_actuators_out_0->control[actuator_controls_s::INDEX_YAW] =
+				-_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];
 		}
 
-		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_YAW] * 0.5f;
-		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] =
-			-_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];
+		
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE] * smooth_fw_start + 0.40f * (1.0f - smooth_fw_start);
+			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE] * smooth_fw_start + 0.70f * (1.0f - smooth_fw_start);
 
 		#if 0
 		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] =

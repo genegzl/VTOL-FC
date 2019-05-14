@@ -702,6 +702,8 @@ void VtolAttitudeControl::task_main()
 			_vtol_type->update_transition_state();
 		}
 
+		_vtol_type->fill_actuator_outputs();
+
 		/* Only publish if the proper mode(s) are enabled */
 		if (_v_control_mode.flag_control_attitude_enabled ||
 		    _v_control_mode.flag_control_rates_enabled ||
@@ -731,7 +733,7 @@ void VtolAttitudeControl::task_main()
 			}
 		}
 
-		_vtol_type->fill_actuator_outputs();
+		
 
 		/*Advertise/Publish vtol vehicle status*/
 		_vtol_vehicle_status.timestamp = hrt_absolute_time();
