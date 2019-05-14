@@ -442,7 +442,7 @@ void Tailsitter::update_transition_state()
 		delt_x = _local_pos->x - _trans_start_x;
 		delt_y = _local_pos->y - _trans_start_y;
 		float lateral_dist = sqrtf(delt_x * delt_x + delt_y * delt_y) * (atan2f(delt_y, delt_x) - _mc_virtual_att_sp->yaw_body);
-		_trans_roll_rot  = math::constrain(-0.02f * lateral_dist, -0.15f, 0.15f);
+		_trans_roll_rot  = 0.0f;//math::constrain(-0.02f * lateral_dist, -0.15f, 0.15f);
 		_vtol_vehicle_status->rollrot      = _trans_roll_rot;
 		_vtol_vehicle_status->lat_dist      = lateral_dist;
 
@@ -604,14 +604,13 @@ void Tailsitter::fill_actuator_outputs()
 		{
 			_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] =
 				_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] * smooth_pr_start
-				+ _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] * (1 - smooth_pr_start)
-				+ _params->fw_pitch_trim;
+				+ (_actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim) * (1.0f - smooth_pr_start);
 			_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] =
 				_actuators_fw_in->control[actuator_controls_s::INDEX_YAW] * smooth_pr_start
-				+ _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL] * (1 - smooth_pr_start);
+				+ _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL] * (1.0f - smooth_pr_start);
 			_actuators_out_0->control[actuator_controls_s::INDEX_YAW] =
 				-_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL]  * smooth_pr_start
-				+ _actuators_mc_in->control[actuator_controls_s::INDEX_YAW] * (1 - smooth_pr_start);
+				+ _actuators_mc_in->control[actuator_controls_s::INDEX_YAW] * (1.0f - smooth_pr_start);
 
 
 		} else{
