@@ -257,8 +257,8 @@ float Tailsitter::thr_from_acc_cmd(float vert_acc_cmd, float airspeed, float pit
 	float bx_acc_err_i    = 0.0f;
 
 	/* bx_acc_kp and bx_acc_ki are from loopshaping */
-	float bx_acc_kp       = 0.005f;
-	float bx_acc_ki       = 0.002f;
+	float bx_acc_kp       = 0.006f;
+	float bx_acc_ki       = 0.003f;
 
 	float thrust_cmd      = 0.0f;
 	float cos_pitch       = 0.0f;
@@ -284,7 +284,7 @@ float Tailsitter::thr_from_acc_cmd(float vert_acc_cmd, float airspeed, float pit
 		lift_weight_ratio = dyn_pressure * 1.0f * CL_temp * 0.5f/ (1.68f * 9.8f);
 		thrust_cmd        = (-_mc_hover_thrust - lift_weight_ratio * (-_mc_hover_thrust) + vert_acc_cmd / 9.8f * (-_mc_hover_thrust)) / cosf(pitch_ang);
 		 ***/
-		cos_pitch     = math::constrain(cosf(pitch_ang), 0.3f, 1.0f);
+		cos_pitch     = math::constrain(cosf(pitch_ang), 0.2f, 1.0f);
 		bx_acc_cmd    = (9.8f + _sensor_acc->z * sinf(pitch_ang) - vert_acc_cmd) / cos_pitch;
 		bx_acc_cmd    = math::constrain(bx_acc_cmd, -2.0f * 9.8f, 2.0f * 9.8f);
 		bx_acc_err    = bx_acc_cmd - _sensor_acc->x;
@@ -334,8 +334,8 @@ float ILC_in(float time_since_trans_start)
  ***/
 float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd)
 {
-	float alt_kp         = 1.0f;
-	float vel_kp         = 1.3f;
+	float alt_kp         = 5.0f;
+	float vel_kp         = 3.0f;
 
 	/* calculate the euler angle from quatnion(follow the Pitch-Roll-Yaw) */
 	matrix::EulerFromQuatf euler = matrix::Quatf(_v_att->q);
@@ -347,7 +347,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd)
 	float horiz_vel      = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));
 	float ILC_input      = ILC_in(time_since_trans_start);
 	float vert_acc_cmd   = (alt_cmd - _local_pos->z) * alt_kp + -_local_pos->vz * vel_kp ;//+ ILC_input * 9.8f / (-_mc_hover_thrust);
-	vert_acc_cmd   = math::constrain(vert_acc_cmd, -2.0f*9.8f, 2.0f*9.8f);
+	vert_acc_cmd         = math::constrain(vert_acc_cmd, -2.0f*9.8f, 2.0f*9.8f);
 	float thrust_cmd     = math::constrain(thr_from_acc_cmd(vert_acc_cmd, horiz_vel, pitch, _local_pos->vz), 0.20f, 0.85f);
 
 	_vtol_vehicle_status->ilc_input 		= ILC_input;
