@@ -90,6 +90,13 @@ VtolAttitudeControl::VtolAttitudeControl()
 	_params_handles.fw_motors_off = param_find("VT_FW_MOT_OFFID");
 	_params_handles.vt_sweep_type = param_find("VT_SWEEP_TYPE");
 	_params_handles.vt_sweep_amp = param_find("VT_SWEEP_AMP");
+	_params_handles.vt_vz_control_kp = param_find("VT_VZ_CONTROL_KP");
+	_params_handles.vt_vz_control_ki = param_find("VT_VZ_CONTROL_KI");
+	_params_handles.vt_vz_control_kd = param_find("VT_VZ_CONTROL_KD");
+	_params_handles.vt_vz_acctime = param_find("VT_VZ_ACCTIME");
+	_params_handles.vt_vz_keeptime = param_find("VT_VZ_KEEPTIME");
+	_params_handles.vt_vz_minspeed = param_find("VT_VZ_MINSPEED");
+	_params_handles.vt_vz_maxspeed = param_find("VT_VZ_MAXSPEED");
 	_params_handles.diff_thrust = param_find("VT_FW_DIFTHR_EN");
 	_params_handles.diff_thrust_scale = param_find("VT_FW_DIFTHR_SC");
 
@@ -503,6 +510,20 @@ VtolAttitudeControl::parameters_update()
 	param_get(_params_handles.front_trans_time_min, &_params.front_trans_time_min);
 
 	param_get(_params_handles.vt_sweep_amp, &_params.vt_sweep_amp);
+
+	param_get(_params_handles.vt_vz_control_kp, &_params.vt_vz_control_kp);
+
+	param_get(_params_handles.vt_vz_control_ki, &_params.vt_vz_control_ki);
+
+	param_get(_params_handles.vt_vz_control_kd, &_params.vt_vz_control_kd);
+
+	param_get(_params_handles.vt_vz_acctime, &_params.vt_vz_acctime);
+
+	param_get(_params_handles.vt_vz_keeptime, &_params.vt_vz_keeptime);
+
+	param_get(_params_handles.vt_vz_minspeed, &_params.vt_vz_minspeed);
+
+	param_get(_params_handles.vt_vz_maxspeed, &_params.vt_vz_maxspeed);
 
 	/*
 	 * Minimum transition time can be maximum 90 percent of the open loop transition time,

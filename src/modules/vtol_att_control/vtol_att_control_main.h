@@ -205,7 +205,14 @@ private:
 		param_t fw_motors_off;
 		param_t vt_sweep_type;
 		param_t vt_sweep_amp;
-		param_t diff_thrust;
+		param_t vt_vz_control_kp;
+		param_t vt_vz_control_ki;
+		param_t vt_vz_control_kd;
+		param_t vt_vz_acctime;
+		param_t vt_vz_keeptime;
+		param_t vt_vz_minspeed;
+		param_t vt_vz_maxspeed;
+		param_t diff_thrust; 
 		param_t diff_thrust_scale;
 	} _params_handles{};
 

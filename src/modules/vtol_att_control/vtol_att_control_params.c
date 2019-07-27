@@ -118,6 +118,55 @@ PARAM_DEFINE_INT32(VT_SWEEP_TYPE, 0);
  */
 PARAM_DEFINE_FLOAT(VT_SWEEP_AMP, 0.2f);
 
+/*
+* The parameters of the vertical velocity controller
+* Kp 
+*/
+
+PARAM_DEFINE_FLOAT(VT_VZ_CONTROL_KP, 1.0f);
+
+/*
+* The parameters of the vertical velocity controller
+* Ki 
+*/
+
+PARAM_DEFINE_FLOAT(VT_VZ_CONTROL_KI, 0.0f);
+
+/*
+* The parameters of the vertical velocity controller
+* Kd 
+*/
+
+PARAM_DEFINE_FLOAT(VT_VZ_CONTROL_KD, 0.0f);
+
+/*
+* The parameters of the vertical velocity command generation
+* Define the acceleration time between two stablized vz
+*/
+
+PARAM_DEFINE_FLOAT(VT_VZ_ACCTIME, 1.0f);
+
+/*
+* The parameters of the vertical velocity command generation
+* Define the maintain time for certain vz
+*/
+
+PARAM_DEFINE_FLOAT(VT_VZ_KEEPTIME, 2.0f);
+
+/*
+* The parameters of the vertical velocity command generation
+* Define the start speed of vz;
+*/
+
+PARAM_DEFINE_FLOAT(VT_VZ_MINSPEED, 5.0f);
+
+/*
+* The parameters of the vertical velocity command generation
+* Define the end speed of vz;
+*/
+
+PARAM_DEFINE_FLOAT(VT_VZ_MAXSPEED, 15.0f);
+
 /**
  * Duration of a front transition
  *
@@ -130,7 +179,7 @@ PARAM_DEFINE_FLOAT(VT_SWEEP_AMP, 0.2f);
  * @decimal 2
  * @group VTOL Attitude Control
  */
-PARAM_DEFINE_FLOAT(VT_SAFE_ALT, 20.0f);
+PARAM_DEFINE_FLOAT(VT_SAFE_ALT, 10.0f);
 
 /**
  * Duration of a front transition

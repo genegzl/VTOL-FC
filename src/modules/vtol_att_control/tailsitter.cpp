@@ -39,13 +39,14 @@
 *
 */
 
-#include "tailsitter.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include "vtol_att_control_main.h"
 #include <systemlib/mavlink_log.h>
+#include <math.h>
+#include "tailsitter.h"
 
 #ifndef M_PI
 #define M_PI (3.14159265f)
@@ -58,8 +59,10 @@
 #define THROTTLE_TRANSITION_MAX   (0.25f)	// maximum added thrust above last value in transition
 #define PITCH_TRANSITION_FRONT_P1 (-_params->front_trans_pitch_sp_p1)	// pitch angle to switch to TRANSITION_P2
 #define PITCH_TRANSITION_BACK     (-0.25f)	// pitch angle to switch to MC
+#define Max_Thrust_cmd 0.9f
+#define	Min_Thrust_cmd 0.1f
 
-//static  orb_advert_t mavlink_log_pub = nullptr;
+static  orb_advert_t mavlink_log_pub = nullptr;
 
 using namespace matrix;
 
@@ -68,7 +71,6 @@ Tailsitter::Tailsitter(VtolAttitudeControl *attc) :
 {
 	_vtol_schedule.flight_mode = MC_MODE;
 	_vtol_schedule.f_trans_start_t = 0.0f;
-
 	_mc_roll_weight = 1.0f;
 	_mc_pitch_weight = 1.0f;
 	_mc_yaw_weight = 1.0f;
@@ -154,9 +156,10 @@ void Tailsitter::update_vtol_state()
 		switch (_vtol_schedule.flight_mode) {
 		case MC_MODE:
 			// initialise a front transition
-		if (_local_pos->z < (- _params->vt_safe_alt)) {
+		if ((_local_pos->z < (- _params->vt_safe_alt)) && !_vtol_schedule.vz_mission_finished){
 			_vtol_schedule.flight_mode 	= TRANSITION_FRONT_P1;
 			_vtol_schedule.f_trans_start_t = hrt_absolute_time();
+			_vtol_schedule.vz_mission_finished = true;
 		}
 			break;
 
@@ -171,10 +174,15 @@ void Tailsitter::update_vtol_state()
 				_vtol_schedule.fw_start = hrt_absolute_time();
 
 				// check if we have reached airspeed  and the transition time is over the setpoint to switch to TRANSITION P2 mode
+				/*
 				if ((airspeed_condition_satisfied && (time_since_trans_start >= (_params->front_trans_duration + _params_tailsitter.front_trans_dur_p2))) || can_transition_on_ground()) {
-					_vtol_schedule.flight_mode = FW_MODE;
+					//_vtol_schedule.flight_mode = FW_MODE;
+					_vtol_schedule.flight_mode = MC_MODE;
 				}
-
+				*/
+				if (time_since_trans_start >= (_params->front_trans_duration + _params_tailsitter.front_trans_dur_p2)){
+					_vtol_schedule.flight_mode = MC_MODE;
+				}
 				break;
 			}
 
@@ -350,7 +358,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd)
 	vert_acc_cmd         = math::constrain(vert_acc_cmd, -2.0f*9.8f, 2.0f*9.8f);
 	float thrust_cmd     = math::constrain(thr_from_acc_cmd(vert_acc_cmd, horiz_vel, pitch, _local_pos->vz), 0.20f, 0.85f);
 
-	_vtol_vehicle_status->ilc_input 		= ILC_input;
+	_vtol_vehicle_status->ilc_input 	= ILC_input;
 	_vtol_vehicle_status->vert_acc_cmd      = vert_acc_cmd;
 	_vtol_vehicle_status->thrust_cmd        = thrust_cmd;
 	_vtol_vehicle_status->ticks_since_trans ++;
@@ -380,11 +388,99 @@ float calc_pitch_rot(float time_since_trans_start) {
 	return angle;
 }
 
+
+/* 
+*  Calculate the vz command according to the predesigned trajectory  
+*  Vz increase from a certain minimum speed Min_Speed to a maximum speed Max_Speed.
+*  Every 1m/s there will be a fixed speed flight interval lasting for KeepTime secs.
+*  AccTime secs will be cost to accelerate the vehicle to increase 1m/s
+*  To smooth the step trajectory, the acceleration interval will be designed from a 
+*  sigmoid function.
+*/
+float Tailsitter::calc_vz_cmd(float time_since_trans_start){
+	int vz_cmd_index;
+	float vz_change_period, current_vz_cmd, time_in_perioid;
+	float k_sigmoid = 20 / _params->vt_vz_acctime, time_in_sigmoid = 0, sigmoid_value = 0;
+
+	vz_change_period = _params->vt_vz_acctime + _params->vt_vz_keeptime;
+	vz_cmd_index = floor(time_since_trans_start / vz_change_period);
+	time_in_perioid = time_since_trans_start - vz_cmd_index * vz_change_period;
+	current_vz_cmd = _params->vt_vz_minspeed + vz_cmd_index * 1.0f;
+
+	if (time_in_perioid > _params->vt_vz_keeptime ){
+
+		time_in_sigmoid = time_in_perioid - _params->vt_vz_keeptime - 0.5f * _params->vt_vz_acctime;
+		sigmoid_value = 1/(1 + exp(-k_sigmoid * time_in_sigmoid));
+		current_vz_cmd += sigmoid_value;
+	}
+
+	if (current_vz_cmd > _params->vt_vz_maxspeed) {
+		current_vz_cmd = 0;
+	}
+
+	return -current_vz_cmd;
+}
+/*
+*  A PID Control will be applied to follow the vz command
+*  Saturation limitation for integrate controller is applied
+*  
+*
+*/
+
+float Tailsitter::control_vertical_speed(float vz, float vz_cmd){
+	float thrust_cmd = 0;
+	float error = 0;
+	float P_output, I_output, D_output, PID_output;
+	float now, dt;
+	float Kp, Ki, Kd;
+	Kp = _params->vt_vz_control_kp;
+	Ki = _params->vt_vz_control_ki;
+	Kd = _params->vt_vz_control_kd;
+	now = float(hrt_absolute_time()) * 1e-6f;
+	dt = now - _VZ_PID_Control.last_run;
+	_VZ_PID_Control.last_run = now;
+	vz_cmd = - vz_cmd;
+	vz = -vz;
+	error = vz_cmd - vz;
+
+	// Integral Saturation 
+	if (_VZ_PID_Control.is_saturated){
+		Ki = 0;
+	};
+	mavlink_log_critical(&mavlink_log_pub, "vz_cmd is :%.5f  vz is: %.5f", (double)(vz_cmd), (double)(vz));
+	// PID Control
+	P_output = Kp * error;
+	D_output = (error - _VZ_PID_Control.last_D_state) * Kd / dt;
+	I_output = _VZ_PID_Control.last_I_state + Ki * error * dt;
+	_VZ_PID_Control.last_D_state = error;
+	_VZ_PID_Control.last_I_state = I_output;
+	PID_output = P_output + I_output + D_output;
+	
+	thrust_cmd = -PID_output + _mc_hover_thrust;
+	
+	_VZ_PID_Control.is_saturated = false;
+	if (-thrust_cmd >= Max_Thrust_cmd){
+		_VZ_PID_Control.is_saturated = true;
+		thrust_cmd = -Max_Thrust_cmd;
+	} else if (-thrust_cmd < Min_Thrust_cmd){
+		_VZ_PID_Control.is_saturated = true;
+		thrust_cmd = -Min_Thrust_cmd;
+	}
+//mavlink_log_critical(&mavlink_log_pub, "airsp:%.2f lift:%.2f aoa:%.3f", (double)(airspeed), (double)(lift_weight_ratio), (double)(ang_of_attack));	
+	mavlink_log_critical(&mavlink_log_pub, "thrust cmd is :%.5f", (double)(thrust_cmd));
+
+
+
+	return thrust_cmd;
+}
+
 void Tailsitter::update_transition_state()
 {
 	float time_since_trans_start = (float)(hrt_absolute_time() - _vtol_schedule.f_trans_start_t) * 1e-6f;
 	float delt_x;
 	float delt_y;
+	float vz_cmd;
+
 
 	if (!_flag_was_in_trans_mode) {
 		_flag_was_in_trans_mode = true;
@@ -433,11 +529,18 @@ void Tailsitter::update_transition_state()
 				   2) + _q_trans_sp(3) * _q_trans_sp(3));
 
 	// calculate the pitch setpoint
+	// For system identification experiment of quadrotor thrust test,
+	// the pitch command is always set to 0 while the thrust_cmd is 
+	// calculate according to the vertical speed vz by a PID controller.
 	if (_vtol_schedule.flight_mode == TRANSITION_FRONT_P1) {
 
 		// const float trans_pitch_rate = M_PI_2_F / _params->front_trans_duration;
-		_trans_pitch_rot = calc_pitch_rot(time_since_trans_start);
+		//_trans_pitch_rot = calc_pitch_rot(time_since_trans_start);
+		_trans_pitch_rot = 0.0f;
 
+		// Calculate the velocity setpoint
+		vz_cmd = calc_vz_cmd(time_since_trans_start);
+		//vz_cmd = -1.0f; // for test PID controller
 		/* lateral control */
 		delt_x = _local_pos->x - _trans_start_x;
 		delt_y = _local_pos->y - _trans_start_y;
@@ -449,7 +552,10 @@ void Tailsitter::update_transition_state()
 		_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
 
 		/* calculate the thrust cmd to control altitude*/
-		_v_att_sp->thrust_body[2] = control_altitude(time_since_trans_start, _alt_sp);
+		/* _v_att_sp->thrust_body[2] = control_altitude(time_since_trans_start, _alt_sp);*/
+
+		/* calculate the thrust cmd to control the vertical speed*/
+		_v_att_sp -> thrust_body[2] = control_vertical_speed(_local_pos->vz, vz_cmd);
 
 		/* save the thrust value at the end of the transition */
 		_trans_end_thrust = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
@@ -562,9 +668,9 @@ void Tailsitter::fill_actuator_outputs()
 				_actuators_out_0->sweep_input = sweep_signal;
 				_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] + sweep_signal;
 				break;
-		    case ROLL_RATE:
-		    	time_since_sweep = (float)(hrt_absolute_time() - _vtol_schedule.sweep_start) * 1e-6f;
-		    	// Exponantial Chirp
+		    	case ROLL_RATE:
+		    		time_since_sweep = (float)(hrt_absolute_time() - _vtol_schedule.sweep_start) * 1e-6f;
+		    		// Exponantial Chirp
 				sweep_signal_phase = sweep_min_frequency * time_since_sweep + 0.0187f * (sweep_max_frequency - sweep_min_frequency) * (overall_time / 4.0f * powf(2.7183f, (4.0f * time_since_sweep / overall_time)) - time_since_sweep);
 				// Linear Chirp
 				// sweep_signal_phase = sweep_min_frequency  * time_since_sweep + 0.5f * (sweep_max_frequency - sweep_min_frequency) * (time_since_sweep * time_since_sweep / overall_time);

@@ -51,6 +51,10 @@
 #include <mathlib/math/EulerFromQuat.hpp>
 #include <uORB/topics/vehicle_local_position.h>
 
+#define Vz_PID_Control_Kp 1;
+#define Vz_PID_Control_Ki 0;
+#define Vz_PID_Control_Kd 0;
+
 class Tailsitter : public VtolType
 {
 
@@ -63,6 +67,8 @@ public:
 	void update_fw_state() override;
 	void fill_actuator_outputs() override;
 	void waiting_on_tecs() override;
+	float control_vertical_speed(float vz, float vz_cmd);
+	float calc_vz_cmd(float time_since_trans_start);
 
 	virtual float control_altitude(float time_since_trans_start, float alt_cmd);
 	virtual float thr_from_acc_cmd(float vert_acc_cmd, float airspeed, float pitch_ang, float aoa);
@@ -75,7 +81,7 @@ private:
 		float fw_pitch_sp_offset;
 		float sys_ident_input;
 		int   sys_ident_num;
-	} _params_tailsitter{};
+	} _params_tailsitter{};	
 
 	struct {
 		param_t front_trans_dur_p2;
@@ -106,7 +112,15 @@ private:
 		hrt_abstime sweep_start;
 		hrt_abstime f_trans_start_t;	/**< absoulte time at which front transition started */
 		hrt_abstime b_trans_start_t;
+		bool 	    vz_mission_finished = false;
 	} _vtol_schedule;
+
+	struct {
+		bool is_saturated = false;
+		float last_D_state = 0;
+		float last_I_state = 0;
+		float last_run;
+	} _VZ_PID_Control;
 
 	matrix::Quatf _q_trans_start;
 	matrix::Quatf _q_trans_sp;
@@ -123,6 +137,7 @@ private:
 	float _trans_start_y;
 	float _CL_Degree[NUM_CL_POINTS+1];
 	float _target_alt;
+
 
 	void parameters_update() override;
 
