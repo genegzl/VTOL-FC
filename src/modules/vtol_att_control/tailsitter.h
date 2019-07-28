@@ -69,6 +69,7 @@ public:
 	void waiting_on_tecs() override;
 	float control_vertical_speed(float vz, float vz_cmd);
 	float calc_vz_cmd(float time_since_trans_start);
+	void calc_q_trans_sp();
 
 	virtual float control_altitude(float time_since_trans_start, float alt_cmd);
 	virtual float thr_from_acc_cmd(float vert_acc_cmd, float airspeed, float pitch_ang, float aoa);
@@ -115,12 +116,14 @@ private:
 		bool 	    vz_mission_finished = false;
 	} _vtol_schedule;
 
-	struct {
+	struct _PID_Control{
 		bool is_saturated = false;
 		float last_D_state = 0;
 		float last_I_state = 0;
 		float last_run;
-	} _VZ_PID_Control;
+	} _VZ_PID_Control,_Lateral_Dist_PID_Control,_Longitudinal_Dist_PID_Control;
+
+
 
 	matrix::Quatf _q_trans_start;
 	matrix::Quatf _q_trans_sp;

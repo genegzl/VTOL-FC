@@ -18,9 +18,14 @@ float32 bx_acc_e
 float32 bx_acc_i              # integrator for body-x acc controller
 float32 rollrot
 float32 lat_dist
+float32 pitchrot
+float32 longitudinal_dist
+float32 vz_cmd
+
 
 bool vtol_in_rw_mode			# true: vtol vehicle is in rotating wing mode
 bool vtol_in_trans_mode
 bool in_transition_to_fw		# True if VTOL is doing a transition from MC to FW
 bool vtol_transition_failsafe		# vtol in transition failsafe mode
 bool fw_permanent_stab			# In fw mode stabilize attitude even if in manual mode
+bool vz_mission_finished		# true if VTOL has jumped into transition mode for vertical speed thrust test

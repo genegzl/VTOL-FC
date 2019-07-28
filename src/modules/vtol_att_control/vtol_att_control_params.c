@@ -167,6 +167,34 @@ PARAM_DEFINE_FLOAT(VT_VZ_MINSPEED, 5.0f);
 
 PARAM_DEFINE_FLOAT(VT_VZ_MAXSPEED, 15.0f);
 
+/*
+* The parameters of the lateral dist controller
+* Kp 
+*/
+
+PARAM_DEFINE_FLOAT(VT_Y_DIST_KP, -0.02f);
+
+/*
+* The parameters of the lateral dist controller
+* Ki 
+*/
+
+PARAM_DEFINE_FLOAT(VT_Y_DIST_KI, -0.00f);
+
+/*
+* The parameters of the longitudinal dist controller
+* Kp 
+*/
+
+PARAM_DEFINE_FLOAT(VT_X_DIST_KP, -0.04f);
+
+/*
+* The parameters of the longitudinal dist controller
+* Ki 
+*/
+
+PARAM_DEFINE_FLOAT(VT_X_DIST_KI, -0.00f);
+
 /**
  * Duration of a front transition
  *

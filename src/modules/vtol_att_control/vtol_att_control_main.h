@@ -212,6 +212,10 @@ private:
 		param_t vt_vz_keeptime;
 		param_t vt_vz_minspeed;
 		param_t vt_vz_maxspeed;
+		param_t vt_y_dist_kp;
+		param_t vt_y_dist_ki;
+		param_t vt_x_dist_kp;
+		param_t vt_x_dist_ki;
 		param_t diff_thrust; 
 		param_t diff_thrust_scale;
 	} _params_handles{};

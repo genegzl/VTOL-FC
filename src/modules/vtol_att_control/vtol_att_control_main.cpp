@@ -97,6 +97,10 @@ VtolAttitudeControl::VtolAttitudeControl()
 	_params_handles.vt_vz_keeptime = param_find("VT_VZ_KEEPTIME");
 	_params_handles.vt_vz_minspeed = param_find("VT_VZ_MINSPEED");
 	_params_handles.vt_vz_maxspeed = param_find("VT_VZ_MAXSPEED");
+	_params_handles.vt_y_dist_kp = param_find("VT_Y_DIST_KP");
+	_params_handles.vt_y_dist_ki = param_find("VT_Y_DIST_KI");
+	_params_handles.vt_x_dist_kp = param_find("VT_X_DIST_KP");
+	_params_handles.vt_x_dist_ki = param_find("VT_X_DIST_KI");			
 	_params_handles.diff_thrust = param_find("VT_FW_DIFTHR_EN");
 	_params_handles.diff_thrust_scale = param_find("VT_FW_DIFTHR_SC");
 
@@ -525,6 +529,13 @@ VtolAttitudeControl::parameters_update()
 
 	param_get(_params_handles.vt_vz_maxspeed, &_params.vt_vz_maxspeed);
 
+	param_get(_params_handles.vt_y_dist_kp, &_params.vt_y_dist_kp);
+
+	param_get(_params_handles.vt_y_dist_ki, &_params.vt_y_dist_ki);
+
+	param_get(_params_handles.vt_x_dist_kp, &_params.vt_x_dist_kp);
+
+	param_get(_params_handles.vt_x_dist_ki, &_params.vt_x_dist_ki);			
 	/*
 	 * Minimum transition time can be maximum 90 percent of the open loop transition time,
 	 * anything else makes no sense and can potentially lead to numerical problems.

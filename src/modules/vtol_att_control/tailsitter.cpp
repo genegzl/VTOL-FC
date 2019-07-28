@@ -160,6 +160,7 @@ void Tailsitter::update_vtol_state()
 			_vtol_schedule.flight_mode 	= TRANSITION_FRONT_P1;
 			_vtol_schedule.f_trans_start_t = hrt_absolute_time();
 			_vtol_schedule.vz_mission_finished = true;
+			_vtol_vehicle_status->vz_mission_finished = true;
 		}
 			break;
 
@@ -466,19 +467,63 @@ float Tailsitter::control_vertical_speed(float vz, float vz_cmd){
 		_VZ_PID_Control.is_saturated = true;
 		thrust_cmd = -Min_Thrust_cmd;
 	}
-//mavlink_log_critical(&mavlink_log_pub, "airsp:%.2f lift:%.2f aoa:%.3f", (double)(airspeed), (double)(lift_weight_ratio), (double)(ang_of_attack));	
+
 	mavlink_log_critical(&mavlink_log_pub, "thrust cmd is :%.5f", (double)(thrust_cmd));
 
-
-
 	return thrust_cmd;
+}
+
+void Tailsitter::calc_q_trans_sp(){
+	float lateral_dist, longitudinal_dist;
+	float rollrot, pitchrot;
+	float Kp,Ki;
+	float P_output, I_output;
+	float dt, now;
+	float delt_x, delt_y;
+
+	now = float(hrt_absolute_time()) * 1e-6f;
+	dt = now - _Lateral_Dist_PID_Control.last_run;
+
+	delt_x = _local_pos->x - _trans_start_x;
+	delt_y = _local_pos->y - _trans_start_y;
+	lateral_dist = sqrtf(delt_x * delt_x + delt_y * delt_y) * sinf((atan2f(delt_y, delt_x) - _mc_virtual_att_sp->yaw_body));
+	longitudinal_dist = sqrtf(delt_x * delt_x + delt_y * delt_y) * cosf((atan2f(delt_y, delt_x) - _mc_virtual_att_sp->yaw_body));
+
+	// PI controller of lateral dist
+	Kp = _params->vt_y_dist_kp;
+	Ki = _params->vt_y_dist_ki;
+	if (_Lateral_Dist_PID_Control.is_saturated){
+		Ki = 0;
+	}
+	P_output = Kp * lateral_dist;
+	I_output = _Lateral_Dist_PID_Control.last_I_state + Ki * lateral_dist * dt;
+	rollrot = P_output + I_output;
+	_trans_roll_rot  = math::constrain(rollrot, -0.15f, 0.15f);
+
+	// PI controller of longitudinal dist
+	Kp = _params->vt_x_dist_kp;
+	Ki = _params->vt_x_dist_ki;
+	if (_Longitudinal_Dist_PID_Control.is_saturated){
+		Ki = 0;
+	}	
+	P_output = Kp * longitudinal_dist;
+	I_output = _Longitudinal_Dist_PID_Control.last_I_state + Ki * longitudinal_dist * dt;
+	pitchrot = P_output + I_output;	
+	_trans_pitch_rot = math::constrain(pitchrot, -0.15f,0.15f);
+
+
+	_vtol_vehicle_status->longitudinal_dist = longitudinal_dist;
+	_vtol_vehicle_status->pitchrot 		= _trans_pitch_rot;
+	_vtol_vehicle_status->rollrot           = _trans_roll_rot;
+	_vtol_vehicle_status->lat_dist          = lateral_dist;
+
+	_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
+
 }
 
 void Tailsitter::update_transition_state()
 {
 	float time_since_trans_start = (float)(hrt_absolute_time() - _vtol_schedule.f_trans_start_t) * 1e-6f;
-	float delt_x;
-	float delt_y;
 	float vz_cmd;
 
 
@@ -540,16 +585,12 @@ void Tailsitter::update_transition_state()
 
 		// Calculate the velocity setpoint
 		vz_cmd = calc_vz_cmd(time_since_trans_start);
-		//vz_cmd = -1.0f; // for test PID controller
-		/* lateral control */
-		delt_x = _local_pos->x - _trans_start_x;
-		delt_y = _local_pos->y - _trans_start_y;
-		float lateral_dist = sqrtf(delt_x * delt_x + delt_y * delt_y) * (atan2f(delt_y, delt_x) - _mc_virtual_att_sp->yaw_body);
-		_trans_roll_rot  = 0.0f;//math::constrain(-0.02f * lateral_dist, -0.15f, 0.15f);
-		_vtol_vehicle_status->rollrot      = _trans_roll_rot;
-		_vtol_vehicle_status->lat_dist      = lateral_dist;
+		_vtol_vehicle_status->vz_cmd = vz_cmd;
 
-		_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
+
+		/* lateral and longitudinal control */
+
+		calc_q_trans_sp();
 
 		/* calculate the thrust cmd to control altitude*/
 		/* _v_att_sp->thrust_body[2] = control_altitude(time_since_trans_start, _alt_sp);*/
@@ -748,12 +789,10 @@ void Tailsitter::fill_actuator_outputs()
 	case TRANSITION_TO_FW:
 	case TRANSITION_TO_MC:
 		// in transition engines are mixed by weight (BACK TRANSITION ONLY)
-		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL]
-				* _mc_roll_weight;
+		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL];
 		_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] =
-			_actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] * _mc_pitch_weight;
-		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW] *
-				_mc_yaw_weight;
+			_actuators_mc_in->control[actuator_controls_s::INDEX_PITCH];
+		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] =
 			_actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
 
