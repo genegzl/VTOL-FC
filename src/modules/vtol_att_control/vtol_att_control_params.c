@@ -179,7 +179,7 @@ PARAM_DEFINE_FLOAT(VT_Y_DIST_KP, -0.02f);
 * Ki 
 */
 
-PARAM_DEFINE_FLOAT(VT_Y_DIST_KI, -0.00f);
+PARAM_DEFINE_FLOAT(VT_VY_KP, -0.00f);
 
 /*
 * The parameters of the longitudinal dist controller
@@ -193,7 +193,7 @@ PARAM_DEFINE_FLOAT(VT_X_DIST_KP, -0.04f);
 * Ki 
 */
 
-PARAM_DEFINE_FLOAT(VT_X_DIST_KI, -0.00f);
+PARAM_DEFINE_FLOAT(VT_VX_KP, -0.00f);
 
 /**
  * Duration of a front transition

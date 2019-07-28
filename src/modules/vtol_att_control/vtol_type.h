@@ -81,9 +81,9 @@ struct Params {
 	float vt_vz_minspeed;
 	float vt_vz_maxspeed;
 	float vt_y_dist_kp;
-	float vt_y_dist_ki;
+	float vt_vy_kp;
 	float vt_x_dist_kp;
-	float vt_x_dist_ki;
+	float vt_vx_kp;
 	int32_t diff_thrust;
 	float diff_thrust_scale;
 };

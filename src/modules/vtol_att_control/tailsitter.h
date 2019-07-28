@@ -121,7 +121,7 @@ private:
 		float last_D_state = 0;
 		float last_I_state = 0;
 		float last_run;
-	} _VZ_PID_Control,_Lateral_Dist_PID_Control,_Longitudinal_Dist_PID_Control;
+	} _VZ_PID_Control;
 
 
 

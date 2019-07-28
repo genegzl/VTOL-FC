@@ -475,40 +475,40 @@ float Tailsitter::control_vertical_speed(float vz, float vz_cmd){
 
 void Tailsitter::calc_q_trans_sp(){
 	float lateral_dist, longitudinal_dist;
+	float lateral_v, longitudinal_v;
 	float rollrot, pitchrot;
-	float Kp,Ki;
-	float P_output, I_output;
-	float dt, now;
+	float Kp,Kvp;
+	float P_output, Pv_output;
 	float delt_x, delt_y;
+	float vx, vy;
 
-	now = float(hrt_absolute_time()) * 1e-6f;
-	dt = now - _Lateral_Dist_PID_Control.last_run;
+
 
 	delt_x = _local_pos->x - _trans_start_x;
 	delt_y = _local_pos->y - _trans_start_y;
-	lateral_dist = sqrtf(delt_x * delt_x + delt_y * delt_y) * sinf((atan2f(delt_y, delt_x) - _mc_virtual_att_sp->yaw_body));
+	vx = _local_pos->vx;
+	vy = _local_pos->vy;
+	lateral_dist = sqrtf(delt_x * delt_x + delt_y * delt_y) * sinf(atan2f(delt_y, delt_x) - _mc_virtual_att_sp->yaw_body);
 	longitudinal_dist = sqrtf(delt_x * delt_x + delt_y * delt_y) * cosf((atan2f(delt_y, delt_x) - _mc_virtual_att_sp->yaw_body));
+	lateral_v = sqrtf(vx * vx + vy * vy) * sinf(atan2f(vy, vx) - _mc_virtual_att_sp-> yaw_body);
+	longitudinal_v = sqrtf(vx * vx + vy * vy) * cosf(atan2f(vy, vx) - _mc_virtual_att_sp-> yaw_body);
 
 	// PI controller of lateral dist
 	Kp = _params->vt_y_dist_kp;
-	Ki = _params->vt_y_dist_ki;
-	if (_Lateral_Dist_PID_Control.is_saturated){
-		Ki = 0;
-	}
+	Kvp = _params->vt_vy_kp;
+
 	P_output = Kp * lateral_dist;
-	I_output = _Lateral_Dist_PID_Control.last_I_state + Ki * lateral_dist * dt;
-	rollrot = P_output + I_output;
+	Pv_output = Kvp * lateral_v;
+	rollrot = P_output + Pv_output;
 	_trans_roll_rot  = math::constrain(rollrot, -0.15f, 0.15f);
 
 	// PI controller of longitudinal dist
 	Kp = _params->vt_x_dist_kp;
-	Ki = _params->vt_x_dist_ki;
-	if (_Longitudinal_Dist_PID_Control.is_saturated){
-		Ki = 0;
-	}	
+	Kvp = _params->vt_vx_kp;
+
 	P_output = Kp * longitudinal_dist;
-	I_output = _Longitudinal_Dist_PID_Control.last_I_state + Ki * longitudinal_dist * dt;
-	pitchrot = P_output + I_output;	
+	Pv_output = Kvp * longitudinal_v;
+	pitchrot = P_output + Pv_output;	
 	_trans_pitch_rot = math::constrain(pitchrot, -0.15f,0.15f);
 
 
@@ -516,6 +516,8 @@ void Tailsitter::calc_q_trans_sp(){
 	_vtol_vehicle_status->pitchrot 		= _trans_pitch_rot;
 	_vtol_vehicle_status->rollrot           = _trans_roll_rot;
 	_vtol_vehicle_status->lat_dist          = lateral_dist;
+	_vtol_vehicle_status->longitudinal_v 	= longitudinal_v;
+	_vtol_vehicle_status->lateral_v 	= lateral_v;
 
 	_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
 

@@ -20,6 +20,8 @@ float32 rollrot
 float32 lat_dist
 float32 pitchrot
 float32 longitudinal_dist
+float32 lateral_v
+float32 longitudinal_v
 float32 vz_cmd
 
 
