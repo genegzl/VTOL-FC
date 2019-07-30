@@ -158,42 +158,73 @@ PARAM_DEFINE_FLOAT(VT_VZ_KEEPTIME, 2.0f);
 * Define the start speed of vz;
 */
 
-PARAM_DEFINE_FLOAT(VT_VZ_MINSPEED, 5.0f);
+PARAM_DEFINE_FLOAT(VT_VZ_MINSPEED, 1.0f);
 
 /*
 * The parameters of the vertical velocity command generation
 * Define the end speed of vz;
 */
 
-PARAM_DEFINE_FLOAT(VT_VZ_MAXSPEED, 15.0f);
+PARAM_DEFINE_FLOAT(VT_VZ_MAXSPEED, 3.0f);
+
+
+/*
+* The parameters of the vertical velocity command generation
+* Define the speed increasing interval of vz;
+*/
+
+PARAM_DEFINE_FLOAT(VT_VZ_INTERVAL,1.0f);
 
 /*
 * The parameters of the lateral dist controller
 * Kp 
 */
 
-PARAM_DEFINE_FLOAT(VT_Y_DIST_KP, -0.02f);
+
+PARAM_DEFINE_FLOAT(VT_Y_DIST_KP, 0.02f);
 
 /*
-* The parameters of the lateral dist controller
+* The parameters of the lateral velocity controller
+* Kp 
+*/
+
+PARAM_DEFINE_FLOAT(VT_VY_KP, 0.00f);
+
+/*
+* The parameters of the lateral velocity controller
 * Ki 
 */
 
-PARAM_DEFINE_FLOAT(VT_VY_KP, -0.00f);
+PARAM_DEFINE_FLOAT(VT_VY_KI, 0.00f);
 
 /*
 * The parameters of the longitudinal dist controller
 * Kp 
 */
 
-PARAM_DEFINE_FLOAT(VT_X_DIST_KP, -0.04f);
+
+PARAM_DEFINE_FLOAT(VT_X_DIST_KP, 0.04f);
 
 /*
-* The parameters of the longitudinal dist controller
-* Ki 
+* The parameters of the longitudinal velocity controller
+* Kp
 */
 
-PARAM_DEFINE_FLOAT(VT_VX_KP, -0.00f);
+PARAM_DEFINE_FLOAT(VT_VX_KP, 0.00f);
+
+/*
+* The parameters of the longitudinal velocity controller
+* Ki
+*/
+
+PARAM_DEFINE_FLOAT(VT_VX_KI, 0.00f);
+
+/*
+* The maximum height of thrust test
+* 
+*/
+
+PARAM_DEFINE_FLOAT(VT_MAX_HEIGHT, 200.00f);
 
 /**
  * Duration of a front transition

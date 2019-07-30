@@ -73,7 +73,7 @@ Tailsitter::Tailsitter(VtolAttitudeControl *attc) :
 	_vtol_schedule.f_trans_start_t = 0.0f;
 	_mc_roll_weight = 1.0f;
 	_mc_pitch_weight = 1.0f;
-	_mc_yaw_weight = 1.0f;
+	_mc_yaw_weight = 1.0f; 
 
 	_flag_was_in_trans_mode = false;
 
@@ -156,11 +156,15 @@ void Tailsitter::update_vtol_state()
 		switch (_vtol_schedule.flight_mode) {
 		case MC_MODE:
 			// initialise a front transition
-		if ((_local_pos->z < (- _params->vt_safe_alt)) && !_vtol_schedule.vz_mission_finished){
+		if (_local_pos->z < (- _params->vt_safe_alt)){
 			_vtol_schedule.flight_mode 	= TRANSITION_FRONT_P1;
 			_vtol_schedule.f_trans_start_t = hrt_absolute_time();
-			_vtol_schedule.vz_mission_finished = true;
-			_vtol_vehicle_status->vz_mission_finished = true;
+			_VY_PID_Control.last_run = _vtol_schedule.b_trans_start_t;
+			_VY_PID_Control.is_saturated = false;	
+			_VY_PID_Control.last_I_state = 0;
+			_VX_PID_Control.last_run = _vtol_schedule.b_trans_start_t;
+			_VX_PID_Control.is_saturated = false;
+			_VX_PID_Control.last_I_state = 0;
 		}
 			break;
 
@@ -175,15 +179,13 @@ void Tailsitter::update_vtol_state()
 				_vtol_schedule.fw_start = hrt_absolute_time();
 
 				// check if we have reached airspeed  and the transition time is over the setpoint to switch to TRANSITION P2 mode
-				/*
+				
 				if ((airspeed_condition_satisfied && (time_since_trans_start >= (_params->front_trans_duration + _params_tailsitter.front_trans_dur_p2))) || can_transition_on_ground()) {
 					//_vtol_schedule.flight_mode = FW_MODE;
 					_vtol_schedule.flight_mode = MC_MODE;
 				}
-				*/
-				if (time_since_trans_start >= (_params->front_trans_duration + _params_tailsitter.front_trans_dur_p2)){
-					_vtol_schedule.flight_mode = MC_MODE;
-				}
+				
+
 				break;
 			}
 
@@ -341,33 +343,36 @@ float ILC_in(float time_since_trans_start)
  *	@input: 
  *	@output:
  ***/
-float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd)
+float Tailsitter::control_altitude(float time_since_trans_start, float vz_cmd)
 {
-	float alt_kp         = 5.0f;
-	float vel_kp         = 3.0f;
-
-	/* calculate the euler angle from quatnion(follow the Pitch-Roll-Yaw) */
-	matrix::EulerFromQuatf euler = matrix::Quatf(_v_att->q);
-
-	/* calculate the feedforward thrust cmd */
-	float pitch          = - euler.theta(); // theta is minus zero
-
-	//float ang_of_attack  = DEG_TO_RAD(96.0f) - pitch; //install pitch angle is 6 degree
-	float horiz_vel      = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));
+	/* calculate the state */
+	//matrix::EulerFromQuatf euler = matrix::Quatf(_v_att->q);	
+	//float pitch          = - euler.theta(); // theta is minus zero
+	//float horiz_vel      = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));
 	float ILC_input      = ILC_in(time_since_trans_start);
-	float vert_acc_cmd   = (alt_cmd - _local_pos->z) * alt_kp + -_local_pos->vz * vel_kp ;//+ ILC_input * 9.8f / (-_mc_hover_thrust);
+
+	/* calculate the vert acc cmd  */
+	//float alt_kp         = 5.0f;
+	float vel_kp         = _params->vt_vz_control_kp;
+
+	/*
+	float vert_acc_cmd   = (vz_cmd - _local_pos->vz) * vel_kp ;//+ ILC_input * 9.8f / (-_mc_hover_thrust);
+	mavlink_log_critical(&mavlink_log_pub, "vz_cmd is %.5f", double(vz_cmd));	
 	vert_acc_cmd         = math::constrain(vert_acc_cmd, -2.0f*9.8f, 2.0f*9.8f);
-	float thrust_cmd     = math::constrain(thr_from_acc_cmd(vert_acc_cmd, horiz_vel, pitch, _local_pos->vz), 0.20f, 0.85f);
+	*/
+
+	float thrust_cmd = -(vz_cmd - _local_pos->vz) * vel_kp;
+	thrust_cmd += - _mc_hover_thrust; 
+	thrust_cmd = math::constrain(thrust_cmd, 0.1f,0.85f);
+
+
+	/* acc loop*/
+	//float thrust_cmd     = math::constrain(thr_from_acc_cmd(vert_acc_cmd, horiz_vel, pitch, _local_pos->vz), 0.20f, 0.85f);
 
 	_vtol_vehicle_status->ilc_input 	= ILC_input;
-	_vtol_vehicle_status->vert_acc_cmd      = vert_acc_cmd;
+	// _vtol_vehicle_status->vert_acc_cmd      = vert_acc_cmd;
 	_vtol_vehicle_status->thrust_cmd        = thrust_cmd;
 	_vtol_vehicle_status->ticks_since_trans ++;
-
-	if ((_vtol_vehicle_status->ticks_since_trans % 10) == 5) 
-	{
-		//mavlink_log_critical(&mavlink_log_pub, "vert_acc_cmd:%.2f thrust_cmd:%.2f", (double)(vert_acc_cmd), (double)(thrust_cmd));
-	}
 	
 	return (-1.0f * thrust_cmd);
 }
@@ -406,16 +411,20 @@ float Tailsitter::calc_vz_cmd(float time_since_trans_start){
 	vz_change_period = _params->vt_vz_acctime + _params->vt_vz_keeptime;
 	vz_cmd_index = floor(time_since_trans_start / vz_change_period);
 	time_in_perioid = time_since_trans_start - vz_cmd_index * vz_change_period;
-	current_vz_cmd = _params->vt_vz_minspeed + vz_cmd_index * 1.0f;
+	current_vz_cmd = _params->vt_vz_minspeed + vz_cmd_index * _params->vt_vz_interval;
 
 	if (time_in_perioid > _params->vt_vz_keeptime ){
 
 		time_in_sigmoid = time_in_perioid - _params->vt_vz_keeptime - 0.5f * _params->vt_vz_acctime;
-		sigmoid_value = 1/(1 + exp(-k_sigmoid * time_in_sigmoid));
+		sigmoid_value = _params->vt_vz_interval/(1 + exp(-k_sigmoid * time_in_sigmoid));
 		current_vz_cmd += sigmoid_value;
 	}
 
 	if (current_vz_cmd > _params->vt_vz_maxspeed) {
+		current_vz_cmd = 0;
+	}
+
+	if (_local_pos->z < (-_params->vt_max_height)){
 		current_vz_cmd = 0;
 	}
 
@@ -428,61 +437,63 @@ float Tailsitter::calc_vz_cmd(float time_since_trans_start){
 *
 */
 
-float Tailsitter::control_vertical_speed(float vz, float vz_cmd){
-	float thrust_cmd = 0;
-	float error = 0;
-	float P_output, I_output, D_output, PID_output;
-	float now, dt;
-	float Kp, Ki, Kd;
-	Kp = _params->vt_vz_control_kp;
-	Ki = _params->vt_vz_control_ki;
-	Kd = _params->vt_vz_control_kd;
-	now = float(hrt_absolute_time()) * 1e-6f;
-	dt = now - _VZ_PID_Control.last_run;
-	_VZ_PID_Control.last_run = now;
-	vz_cmd = - vz_cmd;
-	vz = -vz;
-	error = vz_cmd - vz;
+// float Tailsitter::control_vertical_speed(float vz, float vz_cmd){
+// 	float thrust_cmd = 0;
+// 	float error = 0;
+// 	float P_output, I_output, D_output, PID_output;
+// 	float now, dt;
+// 	float Kp, Ki, Kd;
+// 	Kp = _params->vt_vz_control_kp;
+// 	Ki = _params->vt_vz_control_ki;
+// 	Kd = _params->vt_vz_control_kd;
+// 	now = float(hrt_absolute_time()) * 1e-6f;
+// 	dt = now - _VZ_PID_Control.last_run;
+// 	_VZ_PID_Control.last_run = now;
+// 	vz_cmd = - vz_cmd;
+// 	vz = -vz;
+// 	error = vz_cmd - vz;
 
-	// Integral Saturation 
-	if (_VZ_PID_Control.is_saturated){
-		Ki = 0;
-	};
-	mavlink_log_critical(&mavlink_log_pub, "vz_cmd is :%.5f  vz is: %.5f", (double)(vz_cmd), (double)(vz));
-	// PID Control
-	P_output = Kp * error;
-	D_output = (error - _VZ_PID_Control.last_D_state) * Kd / dt;
-	I_output = _VZ_PID_Control.last_I_state + Ki * error * dt;
-	_VZ_PID_Control.last_D_state = error;
-	_VZ_PID_Control.last_I_state = I_output;
-	PID_output = P_output + I_output + D_output;
+// 	// Integral Saturation 
+// 	if (_VZ_PID_Control.is_saturated){
+// 		Ki = 0;
+// 	};
+// 	mavlink_log_critical(&mavlink_log_pub, "vz_cmd is :%.5f  vz is: %.5f", (double)(vz_cmd), (double)(vz));
+// 	// PID Control
+// 	P_output = Kp * error;
+// 	D_output = (error - _VZ_PID_Control.last_D_state) * Kd / dt;
+// 	I_output = _VZ_PID_Control.last_I_state + Ki * error * dt;
+// 	_VZ_PID_Control.last_D_state = error;
+// 	_VZ_PID_Control.last_I_state = I_output;
+// 	PID_output = P_output + I_output + D_output;
 	
-	thrust_cmd = -PID_output + _mc_hover_thrust;
+// 	thrust_cmd = -PID_output + _mc_hover_thrust;
 	
-	_VZ_PID_Control.is_saturated = false;
-	if (-thrust_cmd >= Max_Thrust_cmd){
-		_VZ_PID_Control.is_saturated = true;
-		thrust_cmd = -Max_Thrust_cmd;
-	} else if (-thrust_cmd < Min_Thrust_cmd){
-		_VZ_PID_Control.is_saturated = true;
-		thrust_cmd = -Min_Thrust_cmd;
-	}
+// 	_VZ_PID_Control.is_saturated = false;
+// 	if (-thrust_cmd >= Max_Thrust_cmd){
+// 		_VZ_PID_Control.is_saturated = true;
+// 		thrust_cmd = -Max_Thrust_cmd;
+// 	} else if (-thrust_cmd < Min_Thrust_cmd){
+// 		_VZ_PID_Control.is_saturated = true;
+// 		thrust_cmd = -Min_Thrust_cmd;
+// 	}
 
-	mavlink_log_critical(&mavlink_log_pub, "thrust cmd is :%.5f", (double)(thrust_cmd));
+// 	mavlink_log_critical(&mavlink_log_pub, "thrust cmd is :%.5f", (double)(thrust_cmd));
 
-	return thrust_cmd;
-}
+// 	return thrust_cmd;
+// }
 
 void Tailsitter::calc_q_trans_sp(){
 	float lateral_dist, longitudinal_dist;
 	float lateral_v, longitudinal_v;
 	float rollrot, pitchrot;
-	float Kp,Kvp;
-	float P_output, Pv_output;
+	float Kp, Kvp, Kvi;
+	float v_cmd, v_error, P_output, I_output;
 	float delt_x, delt_y;
 	float vx, vy;
+	float now, dt;
 
-
+	now = float(hrt_absolute_time()) * 1e-6f;
+	dt = now - _VY_PID_Control.last_run;
 
 	delt_x = _local_pos->x - _trans_start_x;
 	delt_y = _local_pos->y - _trans_start_y;
@@ -496,19 +507,41 @@ void Tailsitter::calc_q_trans_sp(){
 	// PI controller of lateral dist
 	Kp = _params->vt_y_dist_kp;
 	Kvp = _params->vt_vy_kp;
+	Kvi = _params->vt_vy_ki;
 
-	P_output = Kp * lateral_dist;
-	Pv_output = Kvp * lateral_v;
-	rollrot = P_output + Pv_output;
+	if (_VY_PID_Control.is_saturated){
+		Kvi = 0;
+	}
+
+	v_cmd = -Kp * lateral_dist;
+	_vtol_vehicle_status->vy_cmd = v_cmd;
+	v_error = (v_cmd - lateral_v);
+	P_output = Kvp * v_error;
+	I_output = _VY_PID_Control.last_I_state + (-Kvi) * v_error * dt;;
+	rollrot = P_output + I_output;
+	if (fabsf(rollrot) > 0.15f){
+		_VY_PID_Control.is_saturated = true;
+	}	
 	_trans_roll_rot  = math::constrain(rollrot, -0.15f, 0.15f);
 
 	// PI controller of longitudinal dist
 	Kp = _params->vt_x_dist_kp;
 	Kvp = _params->vt_vx_kp;
+	Kvi = _params->vt_vx_ki;
 
-	P_output = Kp * longitudinal_dist;
-	Pv_output = Kvp * longitudinal_v;
-	pitchrot = P_output + Pv_output;	
+	if (_VX_PID_Control.is_saturated){
+		Kvi = 0;
+	}
+
+	v_cmd = -Kp * longitudinal_dist;
+	_vtol_vehicle_status->vx_cmd = v_cmd;
+	v_error = (v_cmd - longitudinal_v);
+	P_output = Kvp * v_error;
+	I_output = _VX_PID_Control.last_I_state + (-Kvi) * v_error * dt;
+	pitchrot = P_output + I_output;	
+	if (fabsf(pitchrot) > 0.15f){
+		_VX_PID_Control.is_saturated = true;
+	}	
 	_trans_pitch_rot = math::constrain(pitchrot, -0.15f,0.15f);
 
 
@@ -518,6 +551,7 @@ void Tailsitter::calc_q_trans_sp(){
 	_vtol_vehicle_status->lat_dist          = lateral_dist;
 	_vtol_vehicle_status->longitudinal_v 	= longitudinal_v;
 	_vtol_vehicle_status->lateral_v 	= lateral_v;
+
 
 	_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
 
@@ -565,8 +599,11 @@ void Tailsitter::update_transition_state()
 
 		_q_trans_sp      = _q_trans_start;
 		_alt_sp          = _local_pos->z;
+		_trans_start_y = _local_pos->y;
+		_trans_start_x = _local_pos->x;
 
 		_mc_hover_thrust = _v_att_sp->thrust_body[2];
+
 	}
 
 	_v_att_sp->thrust_body[2] = _mc_virtual_att_sp->thrust_body[2];
@@ -588,7 +625,7 @@ void Tailsitter::update_transition_state()
 		// Calculate the velocity setpoint
 		vz_cmd = calc_vz_cmd(time_since_trans_start);
 		_vtol_vehicle_status->vz_cmd = vz_cmd;
-
+		
 
 		/* lateral and longitudinal control */
 
@@ -598,8 +635,18 @@ void Tailsitter::update_transition_state()
 		/* _v_att_sp->thrust_body[2] = control_altitude(time_since_trans_start, _alt_sp);*/
 
 		/* calculate the thrust cmd to control the vertical speed*/
-		_v_att_sp -> thrust_body[2] = control_vertical_speed(_local_pos->vz, vz_cmd);
+		_v_att_sp -> thrust_body[2] = control_altitude(time_since_trans_start,vz_cmd);
 
+		static int ii = 0;
+		ii++;
+		if ((ii % 50) == 0) {
+			mavlink_log_critical(&mavlink_log_pub, "vz_cmd is %.5f ; current vz is %.5f", double(vz_cmd), double(_local_pos->vz));	
+			if (fabsf(vz_cmd) <  0.001f){
+				mavlink_log_critical(&mavlink_log_pub, "SPEED TEST FINISHED, SWITCH TO POS MODE!");	
+			}
+		}
+
+		//mavlink_log_critical(&mavlink_log_pub, "thrust_cmd is %.5f", double(_v_att_sp -> thrust_body[2]));
 		/* save the thrust value at the end of the transition */
 		_trans_end_thrust = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
 

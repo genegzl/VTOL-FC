@@ -67,10 +67,12 @@ public:
 	void update_fw_state() override;
 	void fill_actuator_outputs() override;
 	void waiting_on_tecs() override;
-	float control_vertical_speed(float vz, float vz_cmd);
-	float calc_vz_cmd(float time_since_trans_start);
-	void calc_q_trans_sp();
 
+	virtual void calc_q_trans_sp();
+
+	//virtual float control_vertical_speed(float vz, float vz_cmd);
+	virtual float calc_vz_cmd(float time_since_trans_start);
+	
 	virtual float control_altitude(float time_since_trans_start, float alt_cmd);
 	virtual float thr_from_acc_cmd(float vert_acc_cmd, float airspeed, float pitch_ang, float aoa);
 	virtual float get_CL(float aoa);
@@ -117,13 +119,11 @@ private:
 	} _vtol_schedule;
 
 	struct _PID_Control{
-		bool is_saturated = false;
-		float last_D_state = 0;
-		float last_I_state = 0;
-		float last_run;
-	} _VZ_PID_Control;
-
-
+	 	bool is_saturated = false;
+	 	float last_D_state = 0;
+	 	float last_I_state = 0;
+	 	float last_run;
+	} _VY_PID_Control,_VX_PID_Control;
 
 	matrix::Quatf _q_trans_start;
 	matrix::Quatf _q_trans_sp;

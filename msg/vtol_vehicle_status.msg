@@ -23,11 +23,11 @@ float32 longitudinal_dist
 float32 lateral_v
 float32 longitudinal_v
 float32 vz_cmd
-
+float32 vy_cmd
+float32 vx_cmd
 
 bool vtol_in_rw_mode			# true: vtol vehicle is in rotating wing mode
 bool vtol_in_trans_mode
 bool in_transition_to_fw		# True if VTOL is doing a transition from MC to FW
 bool vtol_transition_failsafe		# vtol in transition failsafe mode
 bool fw_permanent_stab			# In fw mode stabilize attitude even if in manual mode
-bool vz_mission_finished		# true if VTOL has jumped into transition mode for vertical speed thrust test
