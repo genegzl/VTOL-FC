@@ -320,14 +320,6 @@ float Tailsitter::thr_from_acc_cmd(float vert_acc_cmd, float airspeed, float pit
 	_vtol_vehicle_status->bx_acc_e   = bx_acc_err;
 	_vtol_vehicle_status->bx_acc_i   = bx_acc_err_i;
 
-	//thrust_cmd = math::constrain(thrust_cmd, 0.1f, 0.9f);
-	static int ii = 0;
-	ii++;
-	if ((ii % 10) == 0) 
-	{
-		//mavlink_log_critical(&mavlink_log_pub, "airsp:%.2f lift:%.2f aoa:%.3f", (double)(airspeed), (double)(lift_weight_ratio), (double)(ang_of_attack));
-	}
-
 	return thrust_cmd;
 }
 
@@ -467,7 +459,8 @@ float calc_pitch_rot(float time_since_trans_start) {
 	return angle;
 }
 
-void Tailsitter::calc_q_trans_sp(){
+void Tailsitter::calc_q_trans_sp()
+{
 	float lateral_dist, longitudinal_dist;
 	float lateral_v, longitudinal_v;
 	float rollrot, pitchrot;
@@ -557,6 +550,16 @@ void Tailsitter::update_transition_state()
 		return;
 	}
 
+<<<<<<< HEAD
+=======
+	/** check mode **/
+	if(_vtol_mode != TRANSITION_TO_FW)
+	{
+		_vtol_mode = ROTARY_WING;
+		return;
+	}
+
+>>>>>>> refine the code:
 	/** initialization **/
 	if (!_flag_was_in_trans_mode) 
 	{
