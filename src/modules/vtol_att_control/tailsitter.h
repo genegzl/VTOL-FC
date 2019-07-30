@@ -69,7 +69,7 @@ public:
 	void waiting_on_tecs() override;
 
 	virtual void calc_q_trans_sp();
-
+	virtual void send_atti_sp();
 	//virtual float control_vertical_speed(float vz, float vz_cmd);
 	virtual float calc_vz_cmd(float time_since_trans_start);
 	
