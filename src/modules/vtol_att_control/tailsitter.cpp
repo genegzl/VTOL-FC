@@ -79,8 +79,17 @@ Tailsitter::Tailsitter(VtolAttitudeControl *attc) :
 	_params_handles_tailsitter.sys_ident_num      = param_find("SYS_IDENT_NUM");
 }
 
-void
-Tailsitter::parameters_update()
+void Tailsitter::PID_Initialize(){
+	float now = float(hrt_absolute_time()) * 1e-6f;
+	_VY_PID_Control.last_run = now;
+	_VY_PID_Control.is_saturated = false;	
+	_VY_PID_Control.last_I_state = 0;
+	_VX_PID_Control.last_run = now;
+	_VX_PID_Control.is_saturated = false;
+	_VX_PID_Control.last_I_state = 0;	
+}
+
+void Tailsitter::parameters_update()
 {
 	float v;
 
@@ -156,12 +165,7 @@ void Tailsitter::update_vtol_state()
 		if (_local_pos->z < (- _params->vt_safe_alt)){
 			_vtol_schedule.flight_mode 	= TRANSITION_FRONT_P1;
 			_vtol_schedule.f_trans_start_t = hrt_absolute_time();
-			_VY_PID_Control.last_run = _vtol_schedule.b_trans_start_t;
-			_VY_PID_Control.is_saturated = false;	
-			_VY_PID_Control.last_I_state = 0;
-			_VX_PID_Control.last_run = _vtol_schedule.b_trans_start_t;
-			_VX_PID_Control.is_saturated = false;
-			_VX_PID_Control.last_I_state = 0;
+
 		}
 			break;
 
@@ -334,6 +338,57 @@ float ILC_in(float time_since_trans_start)
 	}
 }
 
+/*
+*  A PID Control will be applied to follow the vz command
+*  Saturation limitation for integrate controller is applied
+*  
+*
+*/
+
+// float Tailsitter::control_vertical_speed(float vz, float vz_cmd){
+// 	float thrust_cmd = 0;
+// 	float error = 0;
+// 	float P_output, I_output, D_output, PID_output;
+// 	float now, dt;
+// 	float Kp, Ki, Kd;
+// 	Kp = _params->vt_vz_control_kp;
+// 	Ki = _params->vt_vz_control_ki;
+// 	Kd = _params->vt_vz_control_kd;
+// 	now = float(hrt_absolute_time()) * 1e-6f;
+// 	dt = now - _VZ_PID_Control.last_run;
+// 	_VZ_PID_Control.last_run = now;
+// 	vz_cmd = - vz_cmd;
+// 	vz = -vz;
+// 	error = vz_cmd - vz;
+
+// 	// Integral Saturation 
+// 	if (_VZ_PID_Control.is_saturated){
+// 		Ki = 0;
+// 	};
+
+// 	// PID Control
+// 	P_output = Kp * error;
+// 	D_output = (error - _VZ_PID_Control.last_D_state) * Kd / dt;
+// 	I_output = _VZ_PID_Control.last_I_state + Ki * error * dt;
+// 	_VZ_PID_Control.last_D_state = error;
+// 	_VZ_PID_Control.last_I_state = I_output;
+// 	PID_output = P_output + I_output + D_output;
+	
+// 	thrust_cmd = -PID_output + _mc_hover_thrust;
+	
+// 	_VZ_PID_Control.is_saturated = false;
+// 	if (-thrust_cmd >= Max_Thrust_cmd){
+// 		_VZ_PID_Control.is_saturated = true;
+// 		thrust_cmd = -Max_Thrust_cmd;
+// 	} else if (-thrust_cmd < Min_Thrust_cmd){
+// 		_VZ_PID_Control.is_saturated = true;
+// 		thrust_cmd = -Min_Thrust_cmd;
+// 	}
+
+
+// 	return thrust_cmd;
+// }
+
 /***
  *	calculate the thrust cmd using feedforward and feedback controller
  *	@input: 
@@ -349,13 +404,13 @@ float Tailsitter::control_altitude(float time_since_trans_start, float vz_cmd)
 
 	/* calculate the vert acc cmd  */
 	//float alt_kp         = 5.0f;
-	float vel_kp         = _params->vt_vz_control_kp;
 
 	/*
 	float vert_acc_cmd   = (vz_cmd - _local_pos->vz) * vel_kp ;//+ ILC_input * 9.8f / (-_mc_hover_thrust);
 	mavlink_log_critical(&mavlink_log_pub, "vz_cmd is %.5f", double(vz_cmd));	
 	vert_acc_cmd         = math::constrain(vert_acc_cmd, -2.0f*9.8f, 2.0f*9.8f);
 	*/
+	float vel_kp         = _params->vt_vz_control_kp;
 
 	float thrust_cmd = -(vz_cmd - _local_pos->vz) * vel_kp;
 	thrust_cmd += - _mc_hover_thrust; 
@@ -426,57 +481,6 @@ float Tailsitter::calc_vz_cmd(float time_since_trans_start){
 
 	return -current_vz_cmd;
 }
-/*
-*  A PID Control will be applied to follow the vz command
-*  Saturation limitation for integrate controller is applied
-*  
-*
-*/
-
-// float Tailsitter::control_vertical_speed(float vz, float vz_cmd){
-// 	float thrust_cmd = 0;
-// 	float error = 0;
-// 	float P_output, I_output, D_output, PID_output;
-// 	float now, dt;
-// 	float Kp, Ki, Kd;
-// 	Kp = _params->vt_vz_control_kp;
-// 	Ki = _params->vt_vz_control_ki;
-// 	Kd = _params->vt_vz_control_kd;
-// 	now = float(hrt_absolute_time()) * 1e-6f;
-// 	dt = now - _VZ_PID_Control.last_run;
-// 	_VZ_PID_Control.last_run = now;
-// 	vz_cmd = - vz_cmd;
-// 	vz = -vz;
-// 	error = vz_cmd - vz;
-
-// 	// Integral Saturation 
-// 	if (_VZ_PID_Control.is_saturated){
-// 		Ki = 0;
-// 	};
-// 	mavlink_log_critical(&mavlink_log_pub, "vz_cmd is :%.5f  vz is: %.5f", (double)(vz_cmd), (double)(vz));
-// 	// PID Control
-// 	P_output = Kp * error;
-// 	D_output = (error - _VZ_PID_Control.last_D_state) * Kd / dt;
-// 	I_output = _VZ_PID_Control.last_I_state + Ki * error * dt;
-// 	_VZ_PID_Control.last_D_state = error;
-// 	_VZ_PID_Control.last_I_state = I_output;
-// 	PID_output = P_output + I_output + D_output;
-	
-// 	thrust_cmd = -PID_output + _mc_hover_thrust;
-	
-// 	_VZ_PID_Control.is_saturated = false;
-// 	if (-thrust_cmd >= Max_Thrust_cmd){
-// 		_VZ_PID_Control.is_saturated = true;
-// 		thrust_cmd = -Max_Thrust_cmd;
-// 	} else if (-thrust_cmd < Min_Thrust_cmd){
-// 		_VZ_PID_Control.is_saturated = true;
-// 		thrust_cmd = -Min_Thrust_cmd;
-// 	}
-
-// 	mavlink_log_critical(&mavlink_log_pub, "thrust cmd is :%.5f", (double)(thrust_cmd));
-
-// 	return thrust_cmd;
-// }
 
 void Tailsitter::calc_q_trans_sp(){
 	float lateral_dist, longitudinal_dist;

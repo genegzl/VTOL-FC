@@ -51,10 +51,6 @@
 #include <mathlib/math/EulerFromQuat.hpp>
 #include <uORB/topics/vehicle_local_position.h>
 
-#define Vz_PID_Control_Kp 1;
-#define Vz_PID_Control_Ki 0;
-#define Vz_PID_Control_Kd 0;
-
 class Tailsitter : public VtolType
 {
 
@@ -70,6 +66,7 @@ public:
 
 	virtual void calc_q_trans_sp();
 	virtual void send_atti_sp();
+	virtual void PID_Initialize();
 	//virtual float control_vertical_speed(float vz, float vz_cmd);
 	virtual float calc_vz_cmd(float time_since_trans_start);
 	
