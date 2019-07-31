@@ -400,7 +400,7 @@ float Tailsitter::control_altitude(float time_since_trans_start)
 	/* velocity PID control */
 
 	vz_cmd = calc_vz_cmd(time_since_trans_start);
-	_vtol_vehicle_status.vz_cmd = vz_cmd;
+	_vtol_vehicle_status->vz_cmd = vz_cmd;
 
 	vel_kp = _params->vt_vz_control_kp;
 	vel_ki = _params->vt_vz_control_ki;
@@ -413,7 +413,7 @@ float Tailsitter::control_altitude(float time_since_trans_start)
 	vel_error  = vz_cmd - _local_pos->vz;
 	v_P_output = -vel_kp * vel_error;
 	v_I_output =  (-vel_ki) * vel_error * dt + _VZ_PID_Control.last_I_state;
-	v_D_output = (-vel_kd) * (error - _VZ_PID_Control.last_D_state);
+	v_D_output = (-vel_kd) * (vel_error - _VZ_PID_Control.last_D_state);
 
 	_VZ_PID_Control.last_run = now;	
 	_VZ_PID_Control.last_I_state = v_I_output;
@@ -436,6 +436,16 @@ float Tailsitter::control_altitude(float time_since_trans_start)
 	// _vtol_vehicle_status->vert_acc_cmd      = vert_acc_cmd;
 	_vtol_vehicle_status->thrust_cmd        = thrust_cmd;
 	_vtol_vehicle_status->ticks_since_trans ++;
+
+	/* Send control cmd and feedback*/
+	static int ii = 0;
+	ii++;
+	if ((ii % 50) == 0) {
+		mavlink_log_critical(&mavlink_log_pub, "vz_cmd is %.5f ; current vz is %.5f", double(vz_cmd), double(_local_pos->vz));	
+		if (fabsf(vz_cmd) <  0.001f){
+			mavlink_log_critical(&mavlink_log_pub, "SPEED TEST FINISHED, SWITCH TO POS MODE!");	
+		}
+	}
 	
 	return (-1.0f * thrust_cmd);
 }
@@ -539,8 +549,6 @@ void Tailsitter::calc_q_trans_sp(){
 void Tailsitter::update_transition_state()
 {
 	float time_since_trans_start = (float)(hrt_absolute_time() - _vtol_schedule.f_trans_start_t) * 1e-6f;
-	float vz_cmd;
-
 
 	/** check mode **/
 	if(_vtol_mode != TRANSITION_TO_FW)
@@ -584,16 +592,6 @@ void Tailsitter::update_transition_state()
 
 			/* Altitude Control */
 			_v_att_sp -> thrust_body[2] = control_altitude(time_since_trans_start);
-
-			/* Send control cmd and feedback*/
-			static int ii = 0;
-			ii++;
-			if ((ii % 50) == 0) {
-				mavlink_log_critical(&mavlink_log_pub, "vz_cmd is %.5f ; current vz is %.5f", double(vz_cmd), double(_local_pos->vz));	
-				if (fabsf(vz_cmd) <  0.001f){
-					mavlink_log_critical(&mavlink_log_pub, "SPEED TEST FINISHED, SWITCH TO POS MODE!");	
-				}
-			}
 
 			/* save the thrust value at the end of the transition */
 			_trans_end_thrust = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
