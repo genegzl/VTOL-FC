@@ -120,7 +120,7 @@ private:
 	 	float last_D_state = 0;
 	 	float last_I_state = 0;
 	 	float last_run;
-	} _VY_PID_Control,_VX_PID_Control;
+	} _VZ_PID_Control,_VY_PID_Control,_VX_PID_Control;
 
 	matrix::Quatf _q_trans_start;
 	matrix::Quatf _q_trans_sp;
