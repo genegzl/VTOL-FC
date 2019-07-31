@@ -71,7 +71,7 @@ public:
 	virtual float calc_vz_cmd(float time_since_trans_start);
 	
 	virtual float control_altitude(float time_since_trans_start, float alt_cmd, int control_loop_mode);
-	virtual float thr_from_acc_cmd(float vert_acc_cmd, float airspeed, float pitch_ang, float aoa);
+	virtual float control_vertical_acc(float vert_acc_cmd);
 	virtual float get_CL(float aoa);
 
 private:
