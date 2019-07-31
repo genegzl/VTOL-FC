@@ -61,6 +61,7 @@
 #define PITCH_TRANSITION_BACK     (-0.25f)	// pitch angle to switch to MC
 #define Max_Thrust_cmd 0.9f
 #define	Min_Thrust_cmd 0.1f
+#define VERT_CONTROL_MODE  (CONTROL_VEL) // modes: CONTROL_POS, CONTROL_VEL, CONTROL_VEL_WITHOUT_ACC
 
 static  orb_advert_t mavlink_log_pub = nullptr;
 
@@ -374,26 +375,29 @@ float Tailsitter::calc_vz_cmd(float time_since_trans_start){
 }
 
 /***
- *	calculate the thrust cmd using feedforward and feedback controller
+ *	calculate the acceleration cmd using feedforward and feedback controller
  *	@input: 
  *	@output:
  ***/
-float Tailsitter::control_altitude(float time_since_trans_start)
+float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, int control_loop_mode)
 {
+	/* state input */
+	matrix::EulerFromQuatf euler = matrix::Quatf(_v_att->q);	
+	float pitch          = - euler.theta(); // theta is minus zero
+	float ILC_input      = ILC_in(time_since_trans_start);
+	float horiz_vel      = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));
+	
+	/* position loop */
+	float alt_kp         = 5.0f;
+	float vz_cmd = (control_loop_mode == CONTROL_POS) ? ((alt_cmd - _local_pos->z) * alt_kp) : calc_vz_cmd(time_since_trans_start);
+
+	/* velocity loop  */
+	float vel_kp         = _params->vt_vz_control_kp;
 	float now, dt;
 	float vel_kp, vel_ki, vel_kd, vel_error;
 	float v_P_output, v_I_output, v_D_output;
-	float vz_cmd, thrust_cmd = 0;
-
 	now = float(hrt_absolute_time()) * 1e-6f;
 	dt = now - _VZ_PID_Control.last_run;
-
-
-	/* velocity PID control */
-
-	vz_cmd = calc_vz_cmd(time_since_trans_start);
-	_vtol_vehicle_status->vz_cmd = vz_cmd;
-
 	vel_kp = _params->vt_vz_control_kp;
 	vel_ki = _params->vt_vz_control_ki;
 	vel_kd = _params->vt_vz_control_kd;
@@ -411,25 +415,26 @@ float Tailsitter::control_altitude(float time_since_trans_start)
 	_VZ_PID_Control.last_I_state = v_I_output;
 	_VZ_PID_Control.last_D_state = vel_error;
 
-	thrust_cmd = v_P_output + v_I_output + v_D_output;
-	thrust_cmd += - _mc_hover_thrust; 
-	if (thrust_cmd < 0.1f || thrust_cmd > 0.85f){
-		_VZ_PID_Control.is_saturated = true;
-	}
-	else {
-		_VZ_PID_Control.is_saturated = false;
-	}
+	float vert_acc_cmd = v_P_output + v_I_output + v_D_output;
 
-	thrust_cmd = math::constrain(thrust_cmd, 0.1f,0.85f);
-	
 	/* acc loop*/
-	//float thrust_cmd     = math::constrain(thr_from_acc_cmd(vert_acc_cmd, horiz_vel, pitch, _local_pos->vz), 0.20f, 0.85f);
+	float thrust_cmd = 0.0f;
+	if (control_loop_mode == CONTROL_VEL_WITHOUT_ACC)
+	{
+		thrust_cmd = math::constrain(vert_acc_cmd + (- _mc_hover_thrust), 0.1f,0.85f);
+	}
+	else
+	{
+		thrust_cmd = math::constrain(thr_from_acc_cmd(vert_acc_cmd, horiz_vel, pitch, _local_pos->vz), 0.20f, 0.85f);
+	}
 
-	// _vtol_vehicle_status->vert_acc_cmd      = vert_acc_cmd;
-	_vtol_vehicle_status->thrust_cmd        = thrust_cmd;
+	/* record data */
+	_vtol_vehicle_status->vz_cmd       = vz_cmd;
+	_vtol_vehicle_status->ilc_input    = ILC_input;
+	_vtol_vehicle_status->vert_acc_cmd = vert_acc_cmd;
+	_vtol_vehicle_status->thrust_cmd   = thrust_cmd;
 	_vtol_vehicle_status->ticks_since_trans ++;
 
-	/* Send control cmd and feedback*/
 	static int ii = 0;
 	ii++;
 	if ((ii % 50) == 0) {
@@ -438,7 +443,7 @@ float Tailsitter::control_altitude(float time_since_trans_start)
 			mavlink_log_critical(&mavlink_log_pub, "SPEED TEST FINISHED, SWITCH TO POS MODE!");	
 		}
 	}
-	
+
 	return (-1.0f * thrust_cmd);
 }
 
@@ -550,16 +555,6 @@ void Tailsitter::update_transition_state()
 		return;
 	}
 
-<<<<<<< HEAD
-=======
-	/** check mode **/
-	if(_vtol_mode != TRANSITION_TO_FW)
-	{
-		_vtol_mode = ROTARY_WING;
-		return;
-	}
-
->>>>>>> refine the code:
 	/** initialization **/
 	if (!_flag_was_in_trans_mode) 
 	{
@@ -589,12 +584,11 @@ void Tailsitter::update_transition_state()
 	{
 		case TRANSITION_FRONT_P1:
 		{
-
-			/* lateral and longitudinal dist control */
+			/* lateral control */
 			calc_q_trans_sp();
 
-			/* Altitude Control */
-			_v_att_sp -> thrust_body[2] = control_altitude(time_since_trans_start);
+			/* Altitude control */
+			_v_att_sp -> thrust_body[2] = control_altitude(time_since_trans_start, _target_alt, VERT_CONTROL_MODE);
 
 			/* save the thrust value at the end of the transition */
 			_trans_end_thrust = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
@@ -607,7 +601,7 @@ void Tailsitter::update_transition_state()
 
 	send_atti_sp();
 
-	_v_att_sp->timestamp = hrt_absolute_time();
+	
 }
 
 void Tailsitter::send_atti_sp()
@@ -619,6 +613,8 @@ void Tailsitter::send_atti_sp()
 
 	_q_trans_sp.copyTo(_v_att_sp->q_d);
 	_v_att_sp->q_d_valid = true;
+
+	_v_att_sp->timestamp = hrt_absolute_time();
 }
 
 void Tailsitter::waiting_on_tecs()

@@ -70,7 +70,7 @@ public:
 	//virtual float control_vertical_speed(float vz, float vz_cmd);
 	virtual float calc_vz_cmd(float time_since_trans_start);
 	
-	virtual float control_altitude(float time_since_trans_start, float alt_cmd);
+	virtual float control_altitude(float time_since_trans_start, float alt_cmd, int control_loop_mode);
 	virtual float thr_from_acc_cmd(float vert_acc_cmd, float airspeed, float pitch_ang, float aoa);
 	virtual float get_CL(float aoa);
 
@@ -90,19 +90,28 @@ private:
 		param_t sys_ident_num;
 	} _params_handles_tailsitter{};
 
-	enum vtol_mode {
+	enum vtol_mode 
+	{
 		MC_MODE = 0,			/**< vtol is in multicopter mode */
 		TRANSITION_FRONT_P1,	/**< vtol is in front transition part 1 mode */
 		TRANSITION_BACK,		/**< vtol is in back transition mode */
 		FW_MODE					/**< vtol is in fixed wing mode */
 	};
 
-	enum sweep_type {
+	enum sweep_type 
+	{
 		NO_SWEEP = 0,
 		PITCH_RATE,
 		ROLL_RATE,
 		YAW_RATE,
 		THRUST
+	};
+
+	enum control_mode
+	{
+		CONTROL_POS = 0,
+		CONTROL_VEL,
+		CONTROL_VEL_WITHOUT_ACC
 	};
 
 	struct {
