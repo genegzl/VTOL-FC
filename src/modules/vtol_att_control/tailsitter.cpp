@@ -268,9 +268,9 @@ float Tailsitter::get_CL(float aoa)
  *			ang-of-attack
  *	@output: thrust feedforward cmd
  ***/
-float Tailsitter::control_vertical_acc(float vert_acc_cmd)
+float Tailsitter::control_vertical_acc(float time_since_trans_start, float vert_acc_cmd)
 {
-	float ILC_input    = ILC_in(time_since_trans_start);
+	//float ILC_input    = ILC_in(time_since_trans_start);
 
 	float bx_acc_cmd   = 0.0f;
 	float bx_acc_err   = 0.0f;
@@ -283,17 +283,18 @@ float Tailsitter::control_vertical_acc(float vert_acc_cmd)
 	float cos_pitch    = 0.0f;
 
 	/* calculate the states */
-	float airspeed    = _airspeed->indicated_airspeed_m_s
-	float dyn_pressure = 0.5f * 1.237f * airspeed * airspeed;
+	float airspeed    = _airspeed->indicated_airspeed_m_s;
+	//float dyn_pressure = 0.5f * 1.237f * airspeed * airspeed;
 
 	matrix::EulerFromQuatf euler = matrix::Quatf(_v_att->q);
+	float vz         = _local_pos->vz;
 	float ang_of_vel = atan2f(vz, airspeed) * (math::constrain(vz * vz / (5.0f * 5.0f), 0.0f, 1.0f));
 	float pitch      = math::constrain(- euler.theta(), DEG_TO_RAD(0.001f), DEG_TO_RAD(89.99f)); // theta is minus zero
 	float roll       = math::constrain(  euler.phi(), DEG_TO_RAD(0.001f), DEG_TO_RAD(89.99f));
 	float AOA        = math::constrain(ang_of_vel + DEG_TO_RAD(100.0f) - pitch, DEG_TO_RAD(0.001f), DEG_TO_RAD(89.99f));
 
-	float vz         = _local_pos->vz;
-	float horiz_vel  = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));
+	
+	//float horiz_vel  = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));
 	float acc_iz_fdb = (_sensor_acc->z * sinf(pitch) - _sensor_acc->x * cosf(pitch))*cosf(roll);
 	float acc_ix_fdb = (-_sensor_acc->z * cosf(pitch) + _sensor_acc->x * sinf(pitch));
 	
@@ -319,7 +320,7 @@ float Tailsitter::control_vertical_acc(float vert_acc_cmd)
 		bx_acc_err_i      = 0.0f;
 	}
 
-	_vtol_vehicle_status->pitch_ang  = pitch_ang;
+	_vtol_vehicle_status->pitch_ang  = pitch;
 	_vtol_vehicle_status->bx_acc_cmd = bx_acc_cmd;
 	_vtol_vehicle_status->bx_acc_e   = bx_acc_err;
 	_vtol_vehicle_status->bx_acc_i   = bx_acc_err_i;
@@ -418,7 +419,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 	}
 	else
 	{
-		thrust_cmd = math::constrain(control_vertical_acc(vert_acc_cmd), 0.20f, 0.85f);
+		thrust_cmd = math::constrain(control_vertical_acc(time_since_trans_start, vert_acc_cmd), 0.20f, 0.85f);
 	}
 
 	/* record data */
