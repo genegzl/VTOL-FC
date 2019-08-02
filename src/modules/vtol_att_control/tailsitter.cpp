@@ -268,7 +268,7 @@ float Tailsitter::get_CL(float aoa)
  *			ang-of-attack
  *	@output: thrust feedforward cmd
  ***/
-float Tailsitter::control_vertical_acc(float time_since_trans_start, float vert_acc_cmd)
+float Tailsitter::control_vertical_acc(float time_since_trans_start, float vert_acc_cmd, float vert_vel_cmd)
 {
 	//float ILC_input    = ILC_in(time_since_trans_start);
 
@@ -296,7 +296,8 @@ float Tailsitter::control_vertical_acc(float time_since_trans_start, float vert_
 	
 	//float horiz_vel  = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));
 	float acc_iz_fdb = (_sensor_acc->z * sinf(pitch) - _sensor_acc->x * cosf(pitch))*cosf(roll);
-	float acc_ix_fdb = (-_sensor_acc->z * cosf(pitch) + _sensor_acc->x * sinf(pitch));
+	//float acc_ix_fdb = (-_sensor_acc->z * cosf(pitch) + _sensor_acc->x * sinf(pitch));
+	float acc_iz_err = vert_acc_cmd + 9.8f + acc_iz_fdb;
 	
 
 	if ((fabsf(AOA) < DEG_TO_RAD(89.999f)) && (fabsf(AOA) >= DEG_TO_RAD(0.001f)))
@@ -307,7 +308,7 @@ float Tailsitter::control_vertical_acc(float time_since_trans_start, float vert_
 		thrust_cmd        = (-_mc_hover_thrust - lift_weight_ratio * (-_mc_hover_thrust) + vert_acc_cmd / 9.8f * (-_mc_hover_thrust)) / cosf(pitch_ang);
 		 ***/
 		cos_pitch     = math::constrain(cosf(pitch), 0.2f, 1.0f);
-		bx_acc_cmd    = (9.8f + _sensor_acc->z * sinf(pitch) - vert_acc_cmd) / cos_pitch;
+		bx_acc_cmd    = (9.8f + _sensor_acc->z * sinf(pitch) - acc_iz_err) / (cos_pitch - 2.6f * sinf(pitch) * (1 - cosf(pitch)));
 		bx_acc_cmd    = math::constrain(bx_acc_cmd, -2.0f * 9.8f, 2.0f * 9.8f);
 		bx_acc_err    = bx_acc_cmd - _sensor_acc->x;
 		bx_acc_err_i  = _vtol_vehicle_status->bx_acc_i + bx_acc_ki * bx_acc_err * 0.004f;
@@ -419,12 +420,12 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 	}
 	else
 	{
-		thrust_cmd = math::constrain(control_vertical_acc(time_since_trans_start, vert_acc_cmd), 0.20f, 0.85f);
+		thrust_cmd = math::constrain(control_vertical_acc(time_since_trans_start, vert_acc_cmd, vz_cmd), 0.20f, 0.85f);
 	}
 
 	/* record data */
 	_vtol_vehicle_status->vz_cmd       = vz_cmd;
-	_vtol_vehicle_status->ilc_input    = ILC_input;
+	//_vtol_vehicle_status->ilc_input    = ILC_input;
 	_vtol_vehicle_status->vert_acc_cmd = vert_acc_cmd;
 	_vtol_vehicle_status->thrust_cmd   = thrust_cmd;
 	_vtol_vehicle_status->ticks_since_trans ++;
@@ -659,17 +660,17 @@ void Tailsitter::fill_actuator_outputs()
 			case PITCH_RATE:
 				time_since_sweep = (float)(hrt_absolute_time() - _vtol_schedule.sweep_start) * 1e-6f;
 				// Exponantial Chirp
-				sweep_signal_phase = sweep_min_frequency * time_since_sweep + 0.0187f * (sweep_max_frequency - sweep_min_frequency) * (overall_time / 4.0f * powf(2.7183f, (4.0f * time_since_sweep / overall_time)) - time_since_sweep);
+				sweep_signal_phase = 8.0f * 6.2831f * time_since_sweep;//sweep_min_frequency * time_since_sweep + 0.0187f * (sweep_max_frequency - sweep_min_frequency) * (overall_time / 4.0f * powf(2.7183f, (4.0f * time_since_sweep / overall_time)) - time_since_sweep);
 				// Linear Chirp
 				//sweep_signal_phase = sweep_min_frequency * time_since_sweep + 0.5f * (sweep_max_frequency - sweep_min_frequency) * (time_since_sweep * time_since_sweep / overall_time);
 				sweep_signal = (float)(_params->vt_sweep_amp) * sinf(sweep_signal_phase);
 				_actuators_out_0->sweep_input = sweep_signal;
 				_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] + sweep_signal;
 				break;
-		    	case ROLL_RATE:
+		    case ROLL_RATE:
 		    		time_since_sweep = (float)(hrt_absolute_time() - _vtol_schedule.sweep_start) * 1e-6f;
 		    		// Exponantial Chirp
-				sweep_signal_phase = sweep_min_frequency * time_since_sweep + 0.0187f * (sweep_max_frequency - sweep_min_frequency) * (overall_time / 4.0f * powf(2.7183f, (4.0f * time_since_sweep / overall_time)) - time_since_sweep);
+				sweep_signal_phase = 8.0f * 6.2831f * time_since_sweep;//sweep_min_frequency * time_since_sweep + 0.0187f * (sweep_max_frequency - sweep_min_frequency) * (overall_time / 4.0f * powf(2.7183f, (4.0f * time_since_sweep / overall_time)) - time_since_sweep);
 				// Linear Chirp
 				// sweep_signal_phase = sweep_min_frequency  * time_since_sweep + 0.5f * (sweep_max_frequency - sweep_min_frequency) * (time_since_sweep * time_since_sweep / overall_time);
 				sweep_signal = (float)(_params->vt_sweep_amp) * sinf(sweep_signal_phase);
