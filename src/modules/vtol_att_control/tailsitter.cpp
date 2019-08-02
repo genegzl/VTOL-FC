@@ -368,13 +368,13 @@ float Tailsitter::calc_vz_cmd(float time_since_trans_start){
 		current_vz_cmd += sigmoid_value;
 	}
 
-	if (current_vz_cmd > _params->vt_vz_maxspeed) {
-		current_vz_cmd = 0;
+	if (current_vz_cmd > _params->vt_vz_maxspeed + 0.01f) {
+		current_vz_cmd = -5.0f;
 	}
 
 	/* To avoid the vehicle from flying too high */
 	if (_local_pos->z < (-_params->vt_max_height)){
-		current_vz_cmd = 0;
+		current_vz_cmd = -5.0f;
 	}
 
 	return -current_vz_cmd;
@@ -396,7 +396,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 
 	/* velocity loop  */
 	float vel_kp = _params->vt_vz_control_kp;
-	float vel_ki = _VZ_PID_Control.is_saturated ? 0.0f : _params->vt_vz_control_ki;
+	float vel_ki = _params->vt_vz_control_ki;
 	float vel_kd = _params->vt_vz_control_kd;
 
 	float now = float(hrt_absolute_time()) * 1e-6f;
@@ -404,23 +404,24 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 	float vel_error  = vz_cmd - _local_pos->vz;
 	float v_P_output = -vel_kp * vel_error;
 	float v_I_output =  (-vel_ki) * vel_error * dt + _VZ_PID_Control.last_I_state;
+	v_I_output = math::constrain(v_I_output, -0.8f, 0.8f);
 	float v_D_output = (-vel_kd) * (vel_error - _VZ_PID_Control.last_D_state);
 	float vert_acc_cmd = (v_P_output + v_I_output + v_D_output) * 9.8f;
 
 	_VZ_PID_Control.last_run     = now;	
 	_VZ_PID_Control.last_I_state = v_I_output;
 	_VZ_PID_Control.last_D_state = vel_error; 
-	_VZ_PID_Control.is_saturated = (vert_acc_cmd < 0.1f || vert_acc_cmd > 8.5f) ? true : false;//between 0.1G to 1G
+	_VZ_PID_Control.is_saturated = (vert_acc_cmd < 0.1f || vert_acc_cmd > 9.5f) ? true : false;//between 0.1G to 1G
 
 	/* acc loop*/
 	float thrust_cmd = 0.0f;
 	if (control_loop_mode == CONTROL_VEL_WITHOUT_ACC)
 	{
-		thrust_cmd = math::constrain(vert_acc_cmd / 9.8f+ (- _mc_hover_thrust), 0.1f,0.85f);
+		thrust_cmd = math::constrain(vert_acc_cmd / 9.8f+ (- _mc_hover_thrust), 0.10f,0.95f);
 	}
 	else
 	{
-		thrust_cmd = math::constrain(control_vertical_acc(time_since_trans_start, vert_acc_cmd, vz_cmd), 0.20f, 0.85f);
+		thrust_cmd = math::constrain(control_vertical_acc(time_since_trans_start, vert_acc_cmd, vz_cmd), 0.10f, 0.95f);
 	}
 
 	/* record data */
@@ -430,6 +431,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 	_vtol_vehicle_status->thrust_cmd   = thrust_cmd;
 	_vtol_vehicle_status->ticks_since_trans ++;
 
+	/* send back command and feedback data */
 	static int ii = 0;
 	ii++;
 	if ((ii % 50) == 0) {
@@ -559,7 +561,7 @@ void Tailsitter::update_transition_state()
 		Vector3f x      = Dcmf(Quatf(_v_att->q)) * Vector3f(1, 0, 0);
 		_trans_rot_axis = -x.cross(Vector3f(0, 0, -1));
 		_trans_roll_axis  = _trans_rot_axis.cross(Vector3f(0, 0, -1));
-
+		PID_Initialize();
 		_q_trans_sp      = _q_trans_start;
 		_alt_sp          = _local_pos->z;
 		_trans_start_y = _local_pos->y;
