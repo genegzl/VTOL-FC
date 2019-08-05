@@ -75,7 +75,6 @@ Tailsitter::Tailsitter(VtolAttitudeControl *attc) :
 
 	_flag_was_in_trans_mode = false;
 
-	_params_handles_tailsitter.front_trans_dur_p2 = param_find("F_TRANS_DUR_P2");
 	_params_handles_tailsitter.sys_ident_input    = param_find("SYS_IDENT_INPUT");
 	_params_handles_tailsitter.sys_ident_num      = param_find("SYS_IDENT_NUM");
 }
@@ -101,9 +100,6 @@ void Tailsitter::parameters_update()
 	float v;
 
 	/* vtol front transition phase 2 duration */
-	param_get(_params_handles_tailsitter.front_trans_dur_p2, &v);
-	_params_tailsitter.front_trans_dur_p2 = v;
-
 	param_get(_params_handles_tailsitter.sys_ident_input, &v);
 	_params_tailsitter.sys_ident_input = v;
 
@@ -187,7 +183,7 @@ void Tailsitter::update_vtol_state()
 
 				// check if we have reached airspeed  and the transition time is over the setpoint to switch to TRANSITION P2 mode
 				
-				if ((airspeed_condition_satisfied && (time_since_trans_start >= (_params->front_trans_duration + _params_tailsitter.front_trans_dur_p2))) || can_transition_on_ground()) {
+				if ((airspeed_condition_satisfied && (time_since_trans_start >= _params->front_trans_duration)) || can_transition_on_ground()) {
 					//_vtol_schedule.flight_mode = FW_MODE;
 					_vtol_schedule.flight_mode = MC_MODE;
 				}
@@ -380,6 +376,28 @@ float Tailsitter::calc_vz_cmd(float time_since_trans_start){
 	return -current_vz_cmd;
 }
 
+float Tailsitter::control_sideslip()
+{
+	if(_params->vt_sideslip_ctrl_en)
+	{
+		float roll_exceeding_treshold = 0.0f;
+		float min_roll_rad = RAD_TO_DEG(1.0f);
+
+		if (_trans_roll_rot > min_roll_rad)
+		{
+			roll_exceeding_treshold = _trans_roll_rot - min_roll_rad;
+
+		}
+		else if (_trans_roll_rot < - min_roll_rad)
+		{
+			roll_exceeding_treshold = _trans_roll_rot + min_roll_rad;
+
+		}
+		return math::constrain(roll_exceeding_treshold * _params->vt_sideslip_gain, - RAD_TO_DEG(90.0f), RAD_TO_DEG(90.0f));
+	}
+	return 0.0f;
+}
+
 /***
  *	calculate the acceleration cmd using feedforward and feedback controller
  *	@input: 
@@ -436,6 +454,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 	ii++;
 	if ((ii % 50) == 0) {
 		mavlink_log_critical(&mavlink_log_pub, "vz_cmd is %.5f ; current vz is %.5f", double(vz_cmd), double(_local_pos->vz));	
+		mavlink_log_critical(&mavlink_log_pub, "yawspeed cmd: %.5f ; enable ?: %d", double(vz_cmd), _params->vt_sideslip_ctrl_en);
 		if (fabsf(vz_cmd) <  0.001f){
 			mavlink_log_critical(&mavlink_log_pub, "SPEED TEST FINISHED, SWITCH TO POS MODE!");	
 		}
@@ -461,7 +480,7 @@ float calc_pitch_rot(float time_since_trans_start) {
 	return angle;
 }
 
-void Tailsitter::calc_q_trans_sp()
+matrix::Quatf Tailsitter::calc_q_trans_sp()
 {
 	float lateral_dist, longitudinal_dist;
 	float lateral_v, longitudinal_v;
@@ -537,7 +556,7 @@ void Tailsitter::calc_q_trans_sp()
 	_vtol_vehicle_status->longitudinal_v 	= longitudinal_v;
 	_vtol_vehicle_status->lateral_v 	= lateral_v;
 
-	_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
+	return Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
 
 }
 
@@ -582,10 +601,13 @@ void Tailsitter::update_transition_state()
 		case TRANSITION_FRONT_P1:
 		{
 			/* lateral control */
-			calc_q_trans_sp();
+			_q_trans_sp = calc_q_trans_sp();
+
+			/* sideslip control */
+			_v_att_sp->yaw_sp_move_rate = control_sideslip();
 
 			/* Altitude control */
-			_v_att_sp -> thrust_body[2] = control_altitude(time_since_trans_start, _target_alt, VERT_CONTROL_MODE);
+			_v_att_sp->thrust_body[2] = control_altitude(time_since_trans_start, _target_alt, VERT_CONTROL_MODE);
 
 			/* save the thrust value at the end of the transition */
 			_trans_end_thrust = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
@@ -597,8 +619,6 @@ void Tailsitter::update_transition_state()
 	}
 
 	send_atti_sp();
-
-	
 }
 
 void Tailsitter::send_atti_sp()

@@ -193,6 +193,8 @@ private:
 		param_t front_trans_time_min;
 		param_t vt_safe_alt;
 		param_t front_trans_duration;
+		param_t vt_sideslip_ctrl_en;
+		param_t vt_sideslip_gain;
 		param_t front_trans_pitch_sp_p1;
 		param_t back_trans_duration;
 		param_t transition_airspeed;

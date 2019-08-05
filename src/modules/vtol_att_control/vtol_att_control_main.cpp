@@ -78,6 +78,8 @@ VtolAttitudeControl::VtolAttitudeControl()
 	_params_handles.fw_pitch_trim = param_find("VT_FW_PITCH_TRIM");
 	_params_handles.vt_safe_alt = param_find("VT_SAFE_ALT");
 	_params_handles.front_trans_duration = param_find("F_TRANS_DUR");
+	_params_handles.vt_sideslip_ctrl_en = param_find("VT_SIDESLIP_EN");
+	_params_handles.vt_sideslip_gain  = param_find("VT_SIDESLIP_GAIN");
 	_params_handles.front_trans_pitch_sp_p1 = param_find("F_TRANS_PIT_SP");
 	_params_handles.back_trans_duration = param_find("VT_B_TRANS_DUR");
 	_params_handles.transition_airspeed = param_find("VT_ARSP_TRANS");
@@ -558,6 +560,8 @@ VtolAttitudeControl::parameters_update()
 
 	param_get(_params_handles.vt_safe_alt, &_params.vt_safe_alt);
 	param_get(_params_handles.front_trans_duration, &_params.front_trans_duration);
+	param_get(_params_handles.vt_sideslip_ctrl_en, &_params.vt_sideslip_ctrl_en);
+	param_get(_params_handles.vt_sideslip_gain, &_params.vt_sideslip_gain);
 	param_get(_params_handles.front_trans_pitch_sp_p1, &_params.front_trans_pitch_sp_p1);
 	param_get(_params_handles.back_trans_duration, &_params.back_trans_duration);
 	param_get(_params_handles.transition_airspeed, &_params.transition_airspeed);

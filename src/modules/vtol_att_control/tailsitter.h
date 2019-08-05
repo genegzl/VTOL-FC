@@ -41,9 +41,10 @@
 
 #ifndef TAILSITTER_H
 #define TAILSITTER_H
-
+#include <px4_module_params.h>
 #include "vtol_type.h"
 #include "ILC_DATA.h"
+#include <WeatherVane/WeatherVane.hpp>
 #include <perf/perf_counter.h>  /** is it necsacery? **/
 #include <parameters/param.h>
 #include <drivers/drv_hrt.h>
@@ -64,12 +65,12 @@ public:
 	void fill_actuator_outputs() override;
 	void waiting_on_tecs() override;
 
-	virtual void calc_q_trans_sp();
+	virtual matrix::Quatf calc_q_trans_sp();
 	virtual void send_atti_sp();
 	virtual void PID_Initialize();
 	//virtual float control_vertical_speed(float vz, float vz_cmd);
+	virtual float control_sideslip();
 	virtual float calc_vz_cmd(float time_since_trans_start);
-	
 	virtual float control_altitude(float time_since_trans_start, float alt_cmd, int control_loop_mode);
 	virtual float control_vertical_acc(float time_since_trans_start, float vert_acc_cmd, float vert_vel_cmd);
 	virtual float get_CL(float aoa);
@@ -146,7 +147,6 @@ private:
 	float _trans_start_y;
 	float _CL_Degree[NUM_CL_POINTS+1];
 	float _target_alt;
-
 
 	void parameters_update() override;
 

@@ -52,6 +52,7 @@ struct Params {
 	int32_t vtol_motor_count;		// number of motors
 	int32_t vtol_type;
 	bool elevons_mc_lock;		// lock elevons in multicopter mode
+	bool vt_sideslip_ctrl_en;
 	float fw_min_alt;			// minimum relative altitude for FW mode (QuadChute)
 	float fw_alt_err;			// maximum negative altitude error for FW mode (Adaptive QuadChute)
 	float fw_pitch_trim;		// trim for neutral elevon position in fw mode
@@ -61,6 +62,7 @@ struct Params {
 	float front_trans_time_min;
 	float vt_safe_alt;
 	float front_trans_duration;
+	float vt_sideslip_gain;
 	float front_trans_pitch_sp_p1;
 	float back_trans_duration;
 	float transition_airspeed;
