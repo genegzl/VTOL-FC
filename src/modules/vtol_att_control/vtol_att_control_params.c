@@ -240,6 +240,63 @@ PARAM_DEFINE_FLOAT(VT_MAX_HEIGHT, 200.00f);
  */
 PARAM_DEFINE_FLOAT(VT_SAFE_ALT, 10.0f);
 
+/*
+*    For system identification.
+*    Define the max aoa of system identification.
+*
+*/
+
+PARAM_DEFINE_FLOAT(SYSIDT_MAXAOA, 70.0f);
+
+/*
+*    For system identification.
+*    Define the aoa interval of system identification.
+*
+*/
+
+PARAM_DEFINE_FLOAT(SYSIDT_INTERVAL, 5.0f);
+
+/*
+*    For system identification.
+*    Define the min aoa of system identification.
+*
+*/
+
+PARAM_DEFINE_FLOAT(SYSIDT_MINAOA, 5.0f);
+
+/*
+*    For system identification.
+*    Define the time to keep aoa of system identification.
+*
+*/
+
+PARAM_DEFINE_FLOAT(SYSIDT_PITCHTIME, 1.5f);
+
+/*
+*    For system identification.
+*    Define the trim flight speed of system identification.
+*
+*/
+
+PARAM_DEFINE_FLOAT(SYSIDT_ACCSPEED, 13.0f);
+
+/*
+*    For system identification.
+*    Define the flight circles of system identification.
+*
+*/
+
+PARAM_DEFINE_FLOAT(SYSIDT_COUNTER, 14.0f);
+
+/*
+*    For system identification.
+*    Define the roll angle when turning around of system identification.
+*
+*/
+
+PARAM_DEFINE_FLOAT(SYSIDT_ROLL, 5.0f);
+
+
 /**
  * Duration of a front transition
  *

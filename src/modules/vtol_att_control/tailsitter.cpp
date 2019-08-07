@@ -480,7 +480,7 @@ float calc_pitch_rot(float time_since_trans_start) {
 	return angle;
 }
 
-matrix::Quatf Tailsitter::calc_q_trans_sp()
+void Tailsitter::calc_q_trans_sp()
 {
 	float lateral_dist, longitudinal_dist;
 	float lateral_v, longitudinal_v;
@@ -556,8 +556,109 @@ matrix::Quatf Tailsitter::calc_q_trans_sp()
 	_vtol_vehicle_status->longitudinal_v 	= longitudinal_v;
 	_vtol_vehicle_status->lateral_v 	= lateral_v;
 
-	return Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
+	_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
 
+}
+
+void Tailsitter::State_Machine_Initialize(){
+	_vtol_sysidt.state = TRIM_FLIGHT;
+	_vtol_sysidt.global_counter = 0;
+	_vtol_sysidt.trim_counter = 0;
+	_vtol_sysidt.turn_counter = 0;
+	_vtol_sysidt.angle_start = atan2f(_local_pos->vx, _local_pos->vy);
+	_vtol_sysidt.is_accelerated = false;
+	return;
+}
+
+bool Tailsitter::is_ground_speed_satisfied(){
+	float vx = _local_pos->vx;
+	float vy = _local_pos->vy;
+	float angle = atan2f(vy, vx);
+	float delta_angle = RAD_TO_DEG(fabsf(angle - _vtol_sysidt.angle_start));
+	if ((180 - delta_angle) < 1 || delta_angle < 1)
+		return true;
+	else 
+		return false;
+	return false;
+}
+
+float Tailsitter::get_theta_cmd(){
+	float theta;
+	theta = _params->sysidt_maxaoa -  _vtol_sysidt.global_counter * _params->sysidt_interval;
+	if (theta < _params->sysidt_minaoa){
+		theta = _params->sysidt_minaoa;
+	}
+	return (DEG_TO_RAD(theta - 90));
+}
+
+void Tailsitter::update_sysidt_state(){
+	float now = float(hrt_absolute_time()) * 1e-6f;
+	switch (_vtol_sysidt.state){
+
+	case SYSIDT_LOCK:
+		break;
+
+	case TRIM_FLIGHT:
+		/* Global counter */
+		if (_vtol_sysidt.global_counter >= _params->sysidt_counter)
+			_vtol_sysidt.state = SYSIDT_LOCK;
+		else {
+			/* Outer if block check if the trim flight is finished */
+			if (_vtol_sysidt.is_accelerated){
+				/* Check if the tailsitter have kept the pitch for enough time */
+				if ( now - _vtol_sysidt.trim_timer > _params->sysidt_pitchtime){
+					_vtol_sysidt.state = TURN_FLIGHT;
+					_vtol_sysidt.trim_counter += 1;
+
+				}
+			} else {
+				/* Check if the tailsitter finishes the acceleration */
+				if (_airspeed->indicated_airspeed_m_s >= _params->sysidt_accspeed){
+					_vtol_sysidt.is_accelerated = true;
+					_vtol_sysidt.trim_timer = now;				
+				}
+			}
+		}
+		break;
+
+	case TURN_FLIGHT:
+		if (_vtol_sysidt.global_counter >= _params->sysidt_counter)
+			_vtol_sysidt.state = SYSIDT_LOCK;
+		else {
+			if (is_ground_speed_satisfied()){
+				_vtol_sysidt.state = TRIM_FLIGHT;
+				_vtol_sysidt.turn_counter += 1;
+				_vtol_sysidt.is_accelerated = false;
+			}
+		}
+		break;
+	}
+
+	_vtol_sysidt.global_counter = round(_vtol_sysidt.turn_counter / 2);
+	_vtol_vehicle_status->vehicle_sysidt_state = _vtol_sysidt.state;
+	_vtol_vehicle_status->global_counter = _vtol_sysidt.global_counter;
+	return;	
+}
+
+void Tailsitter::run_sysidt_state_machine(){
+	switch (_vtol_sysidt.state){
+	case SYSIDT_LOCK:
+		break;
+	case TRIM_FLIGHT:
+		if (_vtol_sysidt.is_accelerated){
+			_trans_pitch_rot = get_theta_cmd();
+		} else {
+			_trans_pitch_rot = DEG_TO_RAD(5);
+		}
+		_trans_roll_rot = 0.0f;
+		break;
+	case TURN_FLIGHT:
+		_trans_pitch_rot = get_theta_cmd();
+		_trans_roll_rot = _params->sysidt_roll;
+		break;
+	}
+	update_sysidt_state();
+	return;
 }
 
 void Tailsitter::update_transition_state()
@@ -601,7 +702,7 @@ void Tailsitter::update_transition_state()
 		case TRANSITION_FRONT_P1:
 		{
 			/* lateral control */
-			_q_trans_sp = calc_q_trans_sp();
+			calc_q_trans_sp();
 
 			/* sideslip control */
 			_v_att_sp->yaw_sp_move_rate = control_sideslip();

@@ -90,6 +90,13 @@ struct Params {
 	float vt_vx_kp;
 	float vt_vx_ki;
 	float vt_max_height;
+	float sysidt_maxaoa;
+	float sysidt_interval;
+	float sysidt_minaoa;
+	float sysidt_pitchtime;
+	float sysidt_accspeed;
+	float sysidt_counter;
+	float sysidt_roll;
 	int32_t diff_thrust;
 	float diff_thrust_scale;
 };

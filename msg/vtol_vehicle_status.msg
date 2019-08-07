@@ -5,7 +5,10 @@ uint8 VEHICLE_VTOL_STATE_TRANSITION_TO_MC = 2
 uint8 VEHICLE_VTOL_STATE_MC = 3
 uint8 VEHICLE_VTOL_STATE_FW = 4
 
+
+
 uint64 timestamp			# time since system start (microseconds)
+uint64 vehicle_sysidt_state             # State machine record for system identification experiment
 
 uint64  ticks_since_trans               # for ILC debug
 float32 ilc_input                      # feed-forward command of thrust
@@ -25,6 +28,7 @@ float32 longitudinal_v
 float32 vz_cmd
 float32 vy_cmd
 float32 vx_cmd
+float32 global_counter
 
 bool vtol_in_rw_mode			# true: vtol vehicle is in rotating wing mode
 bool vtol_in_trans_mode

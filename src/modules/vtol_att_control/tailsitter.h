@@ -41,10 +41,9 @@
 
 #ifndef TAILSITTER_H
 #define TAILSITTER_H
-#include <px4_module_params.h>
+
 #include "vtol_type.h"
 #include "ILC_DATA.h"
-#include <WeatherVane/WeatherVane.hpp>
 #include <perf/perf_counter.h>  /** is it necsacery? **/
 #include <parameters/param.h>
 #include <drivers/drv_hrt.h>
@@ -65,15 +64,22 @@ public:
 	void fill_actuator_outputs() override;
 	void waiting_on_tecs() override;
 
-	virtual matrix::Quatf calc_q_trans_sp();
+	virtual void calc_q_trans_sp();
 	virtual void send_atti_sp();
 	virtual void PID_Initialize();
+	virtual void State_Machine_Initialize();
+
+	void run_sysidt_state_machine();
+	void update_sysidt_state();
+
 	//virtual float control_vertical_speed(float vz, float vz_cmd);
 	virtual float control_sideslip();
 	virtual float calc_vz_cmd(float time_since_trans_start);
 	virtual float control_altitude(float time_since_trans_start, float alt_cmd, int control_loop_mode);
 	virtual float control_vertical_acc(float time_since_trans_start, float vert_acc_cmd, float vert_vel_cmd);
 	virtual float get_CL(float aoa);
+	virtual float get_theta_cmd();
+	bool is_ground_speed_satisfied();
 
 private:
 
@@ -108,6 +114,13 @@ private:
 		THRUST
 	};
 
+	enum sysidt_state
+	{
+		SYSIDT_LOCK = 0,
+		TRIM_FLIGHT,
+		TURN_FLIGHT
+	};
+
 	enum control_mode
 	{
 		CONTROL_POS = 0,
@@ -124,6 +137,16 @@ private:
 		hrt_abstime b_trans_start_t;
 		bool 	    vz_mission_finished = false;
 	} _vtol_schedule;
+
+	struct {
+		uint8_t state = 0;
+		uint8_t global_counter = 0;		
+		uint8_t trim_counter = 0;
+		uint8_t turn_counter = 0;
+		float trim_timer = 0.0f;
+		float angle_start = 0.0f;
+		bool  is_accelerated = false;
+	} _vtol_sysidt;
 
 	struct _PID_Control{
 	 	bool is_saturated = false;

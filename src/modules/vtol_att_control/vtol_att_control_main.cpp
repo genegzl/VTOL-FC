@@ -107,6 +107,13 @@ VtolAttitudeControl::VtolAttitudeControl()
 	_params_handles.vt_vx_kp = param_find("VT_VX_KP");
 	_params_handles.vt_vx_ki = param_find("VT_VX_KI");
 	_params_handles.vt_max_height = param_find("VT_MAX_HEIGHT");
+	_params_handles.sysidt_maxaoa = param_find("SYSIDT_MAXAOA");
+	_params_handles.sysidt_interval = param_find("SYSIDT_INTERVAL");
+	_params_handles.sysidt_minaoa = param_find("SYSIDT_MINAOA");
+	_params_handles.sysidt_pitchtime = param_find("SYSIDT_PITCHTIME");
+	_params_handles.sysidt_accspeed = param_find("SYSIDT_ACCSPEED");
+	_params_handles.sysidt_counter = param_find("SYSIDT_COUNTER");
+	_params_handles.sysidt_roll = param_find("SYSIDT_ROLL");
 	_params_handles.diff_thrust = param_find("VT_FW_DIFTHR_EN");
 	_params_handles.diff_thrust_scale = param_find("VT_FW_DIFTHR_SC");
 
@@ -549,7 +556,22 @@ VtolAttitudeControl::parameters_update()
 
 	param_get(_params_handles.vt_vx_ki, &_params.vt_vx_ki);
 
-	param_get(_params_handles.vt_max_height, &_params.vt_max_height);			
+	param_get(_params_handles.vt_max_height, &_params.vt_max_height);
+
+	param_get(_params_handles.sysidt_maxaoa, &_params.sysidt_maxaoa);
+
+	param_get(_params_handles.sysidt_minaoa, &_params.sysidt_minaoa);
+
+	param_get(_params_handles.sysidt_interval, &_params.sysidt_interval);
+
+	param_get(_params_handles.sysidt_pitchtime, &_params.sysidt_pitchtime);
+
+	param_get(_params_handles.sysidt_accspeed, &_params.sysidt_accspeed);
+
+	param_get(_params_handles.sysidt_counter, &_params.sysidt_counter);
+
+	param_get(_params_handles.sysidt_roll, &_params.sysidt_roll);
+
 	/*
 	 * Minimum transition time can be maximum 90 percent of the open loop transition time,
 	 * anything else makes no sense and can potentially lead to numerical problems.

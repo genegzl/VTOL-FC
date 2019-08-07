@@ -224,6 +224,13 @@ private:
 		param_t vt_max_height;
 		param_t diff_thrust; 
 		param_t diff_thrust_scale;
+		param_t sysidt_maxaoa;
+		param_t sysidt_interval;
+		param_t sysidt_minaoa;
+		param_t sysidt_pitchtime;
+		param_t sysidt_accspeed;
+		param_t sysidt_counter;
+		param_t sysidt_roll;
 	} _params_handles{};
 
 	/* for multicopters it is usual to have a non-zero idle speed of the engines
