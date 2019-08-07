@@ -433,7 +433,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 
 	/* acc loop*/
 	float thrust_cmd = 0.0f;
-	if (control_loop_mode == CONTROL_VEL_WITHOUT_ACC)
+	if ((control_loop_mode == CONTROL_VEL_WITHOUT_ACC) || (control_loop_mode == CONTROL_POS))
 	{
 		thrust_cmd = math::constrain(vert_acc_cmd / 9.8f+ (- _mc_hover_thrust), 0.10f,0.95f);
 	}
