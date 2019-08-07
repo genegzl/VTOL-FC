@@ -228,7 +228,7 @@ private:
 		param_t sysidt_interval;
 		param_t sysidt_minaoa;
 		param_t sysidt_pitchtime;
-		param_t sysidt_accspeed;
+		param_t sysidt_acctime;
 		param_t sysidt_counter;
 		param_t sysidt_roll;
 	} _params_handles{};

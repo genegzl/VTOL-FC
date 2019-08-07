@@ -78,6 +78,7 @@ public:
 	virtual float control_altitude(float time_since_trans_start, float alt_cmd, int control_loop_mode);
 	virtual float control_vertical_acc(float time_since_trans_start, float vert_acc_cmd, float vert_vel_cmd);
 	virtual float get_CL(float aoa);
+	virtual float calc_pitch_rot(float time_since_trans_start);
 	virtual float get_theta_cmd();
 	bool is_ground_speed_satisfied();
 

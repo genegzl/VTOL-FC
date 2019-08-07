@@ -111,7 +111,7 @@ VtolAttitudeControl::VtolAttitudeControl()
 	_params_handles.sysidt_interval = param_find("SYSIDT_INTERVAL");
 	_params_handles.sysidt_minaoa = param_find("SYSIDT_MINAOA");
 	_params_handles.sysidt_pitchtime = param_find("SYSIDT_PITCHTIME");
-	_params_handles.sysidt_accspeed = param_find("SYSIDT_ACCSPEED");
+	_params_handles.sysidt_acctime = param_find("SYSIDT_ACCTIME");
 	_params_handles.sysidt_counter = param_find("SYSIDT_COUNTER");
 	_params_handles.sysidt_roll = param_find("SYSIDT_ROLL");
 	_params_handles.diff_thrust = param_find("VT_FW_DIFTHR_EN");
@@ -566,7 +566,7 @@ VtolAttitudeControl::parameters_update()
 
 	param_get(_params_handles.sysidt_pitchtime, &_params.sysidt_pitchtime);
 
-	param_get(_params_handles.sysidt_accspeed, &_params.sysidt_accspeed);
+	param_get(_params_handles.sysidt_acctime, &_params.sysidt_acctime);
 
 	param_get(_params_handles.sysidt_counter, &_params.sysidt_counter);
 

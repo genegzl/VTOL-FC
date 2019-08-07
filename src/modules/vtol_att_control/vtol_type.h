@@ -94,7 +94,7 @@ struct Params {
 	float sysidt_interval;
 	float sysidt_minaoa;
 	float sysidt_pitchtime;
-	float sysidt_accspeed;
+	float sysidt_acctime;
 	float sysidt_counter;
 	float sysidt_roll;
 	int32_t diff_thrust;
