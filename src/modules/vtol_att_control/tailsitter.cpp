@@ -391,9 +391,11 @@ float Tailsitter::control_sideslip()
 		else if (_trans_roll_rot < - min_roll_rad)
 		{
 			roll_exceeding_treshold = _trans_roll_rot + min_roll_rad;
-
 		}
-		return math::constrain(roll_exceeding_treshold * _params->vt_sideslip_gain, - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
+
+		float horiz_vel = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));;
+		float sideslip_gain = 9.8f / math::constrain(horiz_vel, 3.0f, 25.0f);
+		return math::constrain(roll_exceeding_treshold * sideslip_gain, - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
 	}
 	return 0.0f;
 }
@@ -467,15 +469,10 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 
 float Tailsitter::calc_pitch_rot(float time_since_trans_start) {
 	float angle = 0.0;
-	float start_pitch = get_theta_cmd();
 	for (int i = 0; i <= (POINT_NUM - 1); i ++) {
 		if (time_since_trans_start <= POINT_ACTION[0][i+1]) {
-			if (i == 0 && _vtol_sysidt.trim_counter >= 1) {
-				angle = start_pitch + (time_since_trans_start - POINT_ACTION[0][i]) / (POINT_ACTION[0][i+1] - POINT_ACTION[0][i]) * (POINT_ACTION[1][i+1] - start_pitch);
-			} else {
-				angle = POINT_ACTION[1][i] + (time_since_trans_start - POINT_ACTION[0][i]) / (POINT_ACTION[0][i+1] - POINT_ACTION[0][i]) * (POINT_ACTION[1][i+1] - POINT_ACTION[1][i]);
-				angle = DEG_TO_RAD(math::constrain(angle, 0.0f, 90.0f));		
-			}
+			angle = POINT_ACTION[1][i] + (time_since_trans_start - POINT_ACTION[0][i]) / (POINT_ACTION[0][i+1] - POINT_ACTION[0][i]) * (POINT_ACTION[1][i+1] - POINT_ACTION[1][i]);
+			angle = DEG_TO_RAD(math::constrain(angle, 0.0f, 90.0f));
 			break;	
 		}
 		if (time_since_trans_start >= POINT_ACTION[0][POINT_NUM - 1]) {
@@ -483,7 +480,7 @@ float Tailsitter::calc_pitch_rot(float time_since_trans_start) {
 		}
 	}
 
-	return -angle;
+	return angle;
 }
 
 void Tailsitter::calc_q_trans_sp()
@@ -583,9 +580,9 @@ bool Tailsitter::is_ground_speed_satisfied(){
 	float vy = _local_pos->vy;
 	float angle = atan2f(vy, vx);
 	float delta_angle = RAD_TO_DEG(fabsf(angle - _vtol_sysidt.angle_start));
-	if (delta_angle < 1 && _vtol_sysidt.trim_counter % 2 ==0)
+	if (delta_angle < 1.0f && _vtol_sysidt.trim_counter % 2 ==0)
 		return (true);
-	else if (180 - delta_angle < 1 && _vtol_sysidt.trim_counter % 2 ==1)
+	else if (180.0f - delta_angle < 1.0f && _vtol_sysidt.trim_counter % 2 ==1)
 		return (true);
 	else return (false);
 	return false;
@@ -597,7 +594,7 @@ float Tailsitter::get_theta_cmd(){
 	if (theta > _params->sysidt_maxaoa){
 		theta = _params->sysidt_maxaoa;
 	}
-	return (90 - theta); 
+	return (90.0f - theta); 
 }
 
 void Tailsitter::update_sysidt_state(){
@@ -614,7 +611,7 @@ void Tailsitter::update_sysidt_state(){
 		else {
 			if (now - _vtol_sysidt.trim_timer >= _params->sysidt_acctime + _params->sysidt_pitchtime){
 				_vtol_sysidt.state = TURN_FLIGHT;
-				_vtol_sysidt.trim_timer += 1;
+				_vtol_sysidt.trim_counter += 1;
 			}
 		}
 		break;
@@ -635,7 +632,7 @@ void Tailsitter::update_sysidt_state(){
 		break;
 	}
 	_vtol_vehicle_status->pitchrot 		= _trans_pitch_rot;
-	_vtol_vehicle_status->rollrot           = _trans_roll_rot;
+	_vtol_vehicle_status->rollrot       = _trans_roll_rot;
 	_vtol_sysidt.global_counter = round(_vtol_sysidt.turn_counter / 2);
 	_vtol_vehicle_status->vehicle_sysidt_state = _vtol_sysidt.state;
 	_vtol_vehicle_status->global_counter = _vtol_sysidt.global_counter;
@@ -652,13 +649,14 @@ void Tailsitter::run_sysidt_state_machine(){
 		if (now - _vtol_sysidt.trim_timer <= _params->sysidt_acctime){
 			_trans_pitch_rot = calc_pitch_rot(now - _vtol_sysidt.trim_timer);
 		} else {
-			_trans_pitch_rot = -DEG_TO_RAD(get_theta_cmd());
+			POINT_ACTION[1][0] = get_theta_cmd();
+			_trans_pitch_rot = DEG_TO_RAD(POINT_ACTION[1][0]);
 		}
 		_trans_roll_rot = 0.0f;
 		calc_q_trans_sp();
 		break;
 	case TURN_FLIGHT:
-		_trans_pitch_rot = -DEG_TO_RAD(get_theta_cmd());
+		_trans_pitch_rot = DEG_TO_RAD(get_theta_cmd());
 		_trans_roll_rot = DEG_TO_RAD(_params->sysidt_roll);
 		_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;		
 		break;
@@ -782,6 +780,15 @@ void Tailsitter::fill_actuator_outputs()
 		_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH];
 		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
+
+		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] =
+			-_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] =
+			_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim;	// pitch elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_YAW] =
+			_actuators_fw_in->control[actuator_controls_s::INDEX_YAW];	// yaw
+		_actuators_out_1->control[actuator_controls_s::INDEX_THROTTLE] =
+			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE];	// throttle
 
 		/* Used for sweep experiment's input signal */
 		if(_attc->is_sweep_requested()) {
