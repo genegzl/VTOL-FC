@@ -65,11 +65,12 @@
 
 #include <lib/FlightTasks/FlightTasks.hpp>
 #include <lib/WeatherVane/WeatherVane.hpp>
+#include <lib/mathlib/math/EulerFromQuat.hpp>
 #include "PositionControl.hpp"
 #include "Utility/ControlMath.hpp"
 
 using namespace time_literals;
-
+using namespace matrix;
 /**
  * Multicopter position control app start / stop handling function
  */
@@ -455,7 +456,8 @@ MulticopterPositionControl::poll_subscriptions()
 	if (updated) {
 		vehicle_attitude_s att;
 		if (orb_copy(ORB_ID(vehicle_attitude), _att_sub, &att) == PX4_OK && PX4_ISFINITE(att.q[0])) {
-			_states.yaw = Eulerf(Quatf(att.q)).psi();
+			matrix::EulerFromQuatf euler_fdb = matrix::Quatf(att.q);
+			_states.yaw = euler_fdb.psi();
 		}
 	}
 
@@ -790,6 +792,12 @@ MulticopterPositionControl::run()
 			_att_sp.yaw_sp_move_rate = _control.getYawspeedSetpoint();
 			_att_sp.fw_control_yaw = false;
 			_att_sp.apply_flaps = false;
+
+			if(_vehicle_status.in_transition_to_fw)
+			{
+				_att_sp.yaw_body = _states.yaw;
+			}
+
 
 			// publish attitude setpoint
 			// Note: this requires review. The reason for not sending

@@ -162,7 +162,7 @@ private:
 	matrix::Vector3f _trans_roll_axis;
 
 	float POINT_ACTION[2][POINT_NUM] = {
-	{0.0f, 2.5f, 3.0f, 4.0f},
+	{0.0f, 2.5f, 3.0f, 3.5f},
 	{0.0f, 85.0f, 85.0f, 85.0f}
 	};
 	float _alt_sp;
@@ -173,6 +173,7 @@ private:
 	float _trans_roll_rot;
 	float _trans_start_x;
 	float _trans_start_y;
+	float _trans_start_yaw;
 	float _CL_Degree[NUM_CL_POINTS+1];
 	float _target_alt;
 

@@ -456,7 +456,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 	ii++;
 	if ((ii % 50) == 0) {
 		mavlink_log_critical(&mavlink_log_pub, "vz_cmd is %.5f ; current vz is %.5f", double(vz_cmd), double(_local_pos->vz));	
-		mavlink_log_critical(&mavlink_log_pub, "yawspeed cmd: %.5f ; enable ?: %d", double(vz_cmd), _params->vt_sideslip_ctrl_en);
+		mavlink_log_critical(&mavlink_log_pub, "yawspeed cmd: %.5f ; enable ?: %d", double(_v_att_sp->yaw_body), _params->vt_sideslip_ctrl_en);
 /*	
 		if (fabsf(vz_cmd) <  0.001f){
 			mavlink_log_critical(&mavlink_log_pub, "SPEED TEST FINISHED, SWITCH TO POS MODE!");	
@@ -503,9 +503,9 @@ void Tailsitter::calc_q_trans_sp()
 	delt_y = _local_pos->y - _trans_start_y;
 	vx = _local_pos->vx;
 	vy = _local_pos->vy;
-	lateral_dist = sqrtf(delt_x * delt_x + delt_y * delt_y) * sinf(atan2f(delt_y, delt_x) - _mc_virtual_att_sp->yaw_body);
+	lateral_dist = sqrtf(delt_x * delt_x + delt_y * delt_y) * sinf(atan2f(delt_y, delt_x) - _trans_start_yaw);
 	// longitudinal_dist = sqrtf(delt_x * delt_x + delt_y * delt_y) * cosf((atan2f(delt_y, delt_x) - _mc_virtual_att_sp->yaw_body));
-	lateral_v = sqrtf(vx * vx + vy * vy) * sinf(atan2f(vy, vx) - _mc_virtual_att_sp-> yaw_body);
+	lateral_v = sqrtf(vx * vx + vy * vy) * sinf(atan2f(vy, vx) - _trans_start_yaw);
 	// longitudinal_v = sqrtf(vx * vx + vy * vy) * cosf(atan2f(vy, vx) - _mc_virtual_att_sp-> yaw_body);
 
 	// PI controller of lateral dist
@@ -523,12 +523,12 @@ void Tailsitter::calc_q_trans_sp()
 	P_output = Kvp * v_error;
 	I_output = _VY_PID_Control.last_I_state + (-Kvi) * v_error * dt;;
 	rollrot = P_output + I_output;
-	if (fabsf(rollrot) > 0.15f){
+	if (fabsf(rollrot) > 0.3f){
 		_VY_PID_Control.is_saturated = true;
 	} else {
 		_VY_PID_Control.is_saturated = false;
 	}	
-	_trans_roll_rot  = math::constrain(rollrot, -0.15f, 0.15f);
+	_trans_roll_rot  = math::constrain(rollrot, -0.3f, 0.3f);
 
 	// PI controller of longitudinal dist
 	/*
@@ -557,7 +557,7 @@ void Tailsitter::calc_q_trans_sp()
 	_vtol_vehicle_status->longitudinal_v 	= longitudinal_v;	
 	*/	
 
-	_vtol_vehicle_status->lat_dist          = lateral_dist;
+	_vtol_vehicle_status->lat_dist      = lateral_dist;
 	_vtol_vehicle_status->lateral_v 	= lateral_v;
 
 	_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
@@ -579,10 +579,10 @@ bool Tailsitter::is_ground_speed_satisfied(){
 	float vx = _local_pos->vx;
 	float vy = _local_pos->vy;
 	float angle = atan2f(vy, vx);
-	float delta_angle = RAD_TO_DEG(fabsf(angle - _vtol_sysidt.angle_start));
-	if (delta_angle < 1.0f && _vtol_sysidt.trim_counter % 2 ==0)
+	float delta_angle = RAD_TO_DEG(fabsf(angle - _trans_start_yaw));
+	if (fabsf(delta_angle) < 1.0f && _vtol_sysidt.trim_counter % 2 ==0)
 		return (true);
-	else if (180.0f - delta_angle < 1.0f && _vtol_sysidt.trim_counter % 2 ==1)
+	else if (fabsf(180.0f - delta_angle) < 1.0f && _vtol_sysidt.trim_counter % 2 ==1)
 		return (true);
 	else return (false);
 	return false;
@@ -691,6 +691,8 @@ void Tailsitter::update_transition_state()
 		_alt_sp          = _local_pos->z;
 		_trans_start_y = _local_pos->y;
 		_trans_start_x = _local_pos->x;
+		_trans_start_yaw = _mc_virtual_att_sp->yaw_body;
+		_v_att_sp->yaw_body = _mc_virtual_att_sp->yaw_body;
 
 		_mc_hover_thrust = _v_att_sp->thrust_body[2];
 		_vert_i_term = 0.0f;
@@ -733,7 +735,8 @@ void Tailsitter::send_atti_sp()
 	const Eulerf euler_sp(_q_trans_sp);
 	_v_att_sp->roll_body = euler_sp.phi();
 	_v_att_sp->pitch_body = euler_sp.theta();
-	_v_att_sp->yaw_body = euler_sp.psi();
+	float dt = float(hrt_absolute_time()) * 1e-6f - _VY_PID_Control.last_run;
+	_v_att_sp->yaw_body += dt * _v_att_sp->yaw_sp_move_rate;
 
 	_q_trans_sp.copyTo(_v_att_sp->q_d);
 	_v_att_sp->q_d_valid = true;
@@ -766,6 +769,8 @@ void Tailsitter::fill_actuator_outputs()
 	float sweep_min_frequency = 0.5f * 6.2831f;
 	float sweep_max_frequency = 80.0f * 6.2831f ;
 	float overall_time = 150.0f;
+	float time_since_trans_start = (float)(hrt_absolute_time() - _vtol_schedule.f_trans_start_t) * 1e-6f;
+
 	_actuators_out_0->timestamp = hrt_absolute_time();
 	_actuators_out_0->timestamp_sample = _actuators_mc_in->timestamp_sample;
 
@@ -774,21 +779,10 @@ void Tailsitter::fill_actuator_outputs()
 
 	switch (_vtol_mode) {
 	case ROTARY_WING:
-	case TRANSITION_TO_FW:
-	case TRANSITION_TO_MC:
 		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL];
 		_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH];
 		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
-
-		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] =
-			-_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
-		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim;	// pitch elevon
-		_actuators_out_1->control[actuator_controls_s::INDEX_YAW] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_YAW];	// yaw
-		_actuators_out_1->control[actuator_controls_s::INDEX_THROTTLE] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE];	// throttle
 
 		/* Used for sweep experiment's input signal */
 		if(_attc->is_sweep_requested()) {
@@ -869,5 +863,22 @@ void Tailsitter::fill_actuator_outputs()
 			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE] * smooth_fw_start + 0.70f * (1.0f - smooth_fw_start);
 
 		break;
+
+	case TRANSITION_TO_FW:
+	case TRANSITION_TO_MC:
+		smooth_fw_start = math::constrain(time_since_trans_start / POINT_ACTION[0][2], 0.0f, 1.0f);
+		if (time_since_fw_start <= 0.05f)
+		{
+			_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] =
+			_actuators_fw_in->control[actuator_controls_s::INDEX_YAW] * smooth_fw_start + _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL] * (1.0f - smooth_fw_start);
+		}
+
+		//_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL];
+		_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH];
+		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
+		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
+
+		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL]  = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = _actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim;	// pitch elevon
 	}
 }

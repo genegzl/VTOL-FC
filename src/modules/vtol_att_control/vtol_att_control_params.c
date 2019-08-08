@@ -181,21 +181,21 @@ PARAM_DEFINE_FLOAT(VT_VZ_INTERVAL,1.0f);
 */
 
 
-PARAM_DEFINE_FLOAT(VT_Y_DIST_KP, 0.02f);
+PARAM_DEFINE_FLOAT(VT_Y_DIST_KP, 0.1f);
 
 /*
 * The parameters of the lateral velocity controller
 * Kp 
 */
 
-PARAM_DEFINE_FLOAT(VT_VY_KP, 0.00f);
+PARAM_DEFINE_FLOAT(VT_VY_KP, 0.1f);
 
 /*
 * The parameters of the lateral velocity controller
 * Ki 
 */
 
-PARAM_DEFINE_FLOAT(VT_VY_KI, 0.00f);
+PARAM_DEFINE_FLOAT(VT_VY_KI, 0.01f);
 
 /*
 * The parameters of the longitudinal dist controller
@@ -203,21 +203,21 @@ PARAM_DEFINE_FLOAT(VT_VY_KI, 0.00f);
 */
 
 
-PARAM_DEFINE_FLOAT(VT_X_DIST_KP, 0.04f);
+PARAM_DEFINE_FLOAT(VT_X_DIST_KP, 0.1f);
 
 /*
 * The parameters of the longitudinal velocity controller
 * Kp
 */
 
-PARAM_DEFINE_FLOAT(VT_VX_KP, 0.00f);
+PARAM_DEFINE_FLOAT(VT_VX_KP, 0.1f);
 
 /*
 * The parameters of the longitudinal velocity controller
 * Ki
 */
 
-PARAM_DEFINE_FLOAT(VT_VX_KI, 0.00f);
+PARAM_DEFINE_FLOAT(VT_VX_KI, 0.01f);
 
 /*
 * The maximum height of thrust test
