@@ -60,6 +60,7 @@
 #define AXIS_INDEX_YAW 2
 #define AXIS_COUNT 3
 
+static orb_advert_t mavlink_log_pub = nullptr;
 
 using namespace matrix;
 
@@ -521,6 +522,13 @@ MulticopterAttitudeControl::generate_attitude_setpoint(float dt, bool reset_yaw_
 		attitude_setpoint.pitch_body = atan2f(z_roll_pitch_sp(0), z_roll_pitch_sp(2));
 	}
 
+	static int ii = 0;
+	ii ++;
+	if ((ii % 100) == 0)
+	{
+		mavlink_log_critical(&mavlink_log_pub, "mc_att_sp yaw: %.5f", double(attitude_setpoint.yaw_body));
+	}
+
 	/* copy quaternion setpoint to attitude setpoint topic */
 	Quatf q_sp = Eulerf(attitude_setpoint.roll_body, attitude_setpoint.pitch_body, attitude_setpoint.yaw_body);
 	q_sp.copyTo(attitude_setpoint.q_d);
@@ -606,6 +614,12 @@ MulticopterAttitudeControl::control_attitude()
 	 */
 	_rates_sp += q.inversed().dcm_z() * _v_att_sp.yaw_sp_move_rate;
 
+	static int ii = 0;
+	ii ++;
+	if ((ii % 100) == 0)
+	{
+		mavlink_log_critical(&mavlink_log_pub, "mc_att_sp yawspeed: %.5f", double(_v_att_sp.yaw_sp_move_rate));
+	}
 
 	/* limit rates */
 	for (int i = 0; i < 3; i++) {

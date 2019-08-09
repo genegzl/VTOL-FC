@@ -43,6 +43,8 @@
  */
 extern "C" __EXPORT int fw_att_control_main(int argc, char *argv[]);
 
+//static  orb_advert_t mavlink_log_pub = nullptr;
+
 FixedwingAttitudeControl::FixedwingAttitudeControl() :
 	_airspeed_sub(ORB_ID(airspeed)),
 	_lp_filters_d{
@@ -451,7 +453,7 @@ FixedwingAttitudeControl::vehicle_status_poll()
 		// by the multicoper attitude controller. Therefore, modify the control mode to achieve rate
 		// control only
 		if (_vehicle_status.is_vtol) {
-			if (_vehicle_status.is_rotary_wing) {
+			if (_vehicle_status.is_rotary_wing && !_vehicle_status.in_transition_to_fw) {
 				_vcontrol_mode.flag_control_attitude_enabled = false;
 				_vcontrol_mode.flag_control_manual_enabled = false;
 			}
