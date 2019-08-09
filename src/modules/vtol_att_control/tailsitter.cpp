@@ -549,8 +549,8 @@ void Tailsitter::calc_q_trans_sp()
 	_vtol_vehicle_status->lat_dist      = lateral_dist;
 	_vtol_vehicle_status->lateral_v 	= lateral_v;
 
-	_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;
-
+	//_q_trans_sp = Quatf(AxisAnglef(_trans_pitch_axis, _trans_pitch_rot)) * Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot)) * _q_trans_start;
+	_q_trans_sp = Eulerf(_trans_roll_rot, -_trans_pitch_rot, _yaw);
 }
 
 void Tailsitter::State_Machine_Initialize(){
@@ -651,11 +651,30 @@ void Tailsitter::run_sysidt_state_machine(){
 	case TURN_FLIGHT:
 		_trans_pitch_rot = DEG_TO_RAD(get_theta_cmd());
 		_trans_roll_rot = DEG_TO_RAD(_params->sysidt_roll);
-		_q_trans_sp = Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot))*Quatf(AxisAnglef(_trans_rot_axis, _trans_pitch_rot)) * _q_trans_start;		
+		//_q_trans_sp = Quatf(AxisAnglef(_trans_pitch_axis, _trans_pitch_rot)) * Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot)) * _q_trans_start;		
+		_q_trans_sp = Eulerf(_trans_roll_rot, -_trans_pitch_rot, _yaw);
 		break;
 	}
 	update_sysidt_state();
 	return;
+}
+
+void Tailsitter::update_axis_vector()
+{
+	Vector3f x = Dcmf(Quatf(_v_att->q)) * Vector3f(1, 0, 0);
+	_trans_pitch_axis = -x.cross(Vector3f(0, 0, -1));
+	_trans_roll_axis  = _trans_pitch_axis.cross(Vector3f(0, 0, -1));
+
+	_yaw = Eulerf(Quatf(_v_att->q)).psi();
+
+	_q_trans_start = Eulerf(0.0f, 0.0f, Eulerf(Quatf(_v_att->q)).psi());
+	
+	static int ii = 0;
+	ii ++;
+	if ((ii % 100) == 0)
+	{
+		mavlink_log_critical(&mavlink_log_pub, "calulated yaw: %.5f actual yaw: %.5f", double(_yaw), double(Eulerf(Quatf(_v_att->q)).psi()));
+	}
 }
 
 void Tailsitter::update_transition_state()
@@ -674,10 +693,11 @@ void Tailsitter::update_transition_state()
 	{
 		_flag_was_in_trans_mode = true;
 
+		Vector3f x        = Dcmf(Quatf(_v_att->q)) * Vector3f(1, 0, 0);
+		_trans_pitch_axis = -x.cross(Vector3f(0, 0, -1));
+		_trans_roll_axis  = _trans_pitch_axis.cross(Vector3f(0, 0, -1));
 		_q_trans_start  = Eulerf(0.0f, 0.0f, _mc_virtual_att_sp->yaw_body);
-		Vector3f x      = Dcmf(Quatf(_v_att->q)) * Vector3f(1, 0, 0);
-		_trans_rot_axis = -x.cross(Vector3f(0, 0, -1));
-		_trans_roll_axis  = _trans_rot_axis.cross(Vector3f(0, 0, -1));
+
 		PID_Initialize();
 		State_Machine_Initialize();
 		_q_trans_sp      = _q_trans_start;
@@ -700,18 +720,14 @@ void Tailsitter::update_transition_state()
 	{
 		case TRANSITION_FRONT_P1:
 		{
+			update_axis_vector();
+
 			run_sysidt_state_machine();
 			/* lateral control */
 			//calc_q_trans_sp();
 
 			/* sideslip control */
 			_v_att_sp->yaw_sp_move_rate = control_sideslip();
-			static int ii = 0;
-			ii ++;
-			if ((ii % 100) == 0)
-			{
-				mavlink_log_critical(&mavlink_log_pub, "tailsitter yawspeed: %.5f", double(_v_att_sp->yaw_sp_move_rate));
-			}
 
 			/* Altitude control */
 			_v_att_sp->thrust_body[2] = control_altitude(time_since_trans_start, _alt_sp, VERT_CONTROL_MODE);
@@ -731,14 +747,12 @@ void Tailsitter::update_transition_state()
 void Tailsitter::send_atti_sp()
 {
 	const Eulerf euler_sp(_q_trans_sp);
-	Eulerf euler_fdb = Quatf(_v_att->q);
-	_v_att_sp->roll_body = euler_sp.phi();
+
+	_v_att_sp->roll_body  = euler_sp.phi();
 	_v_att_sp->pitch_body = euler_sp.theta();
-	_v_att_sp->yaw_body   = euler_fdb.psi();
+	_v_att_sp->yaw_body   = euler_sp.psi();
 
-	Quatf q_sp = Eulerf(_v_att_sp->roll_body, _v_att_sp->pitch_body, _v_att_sp->yaw_body);
-
-	q_sp.copyTo(_v_att_sp->q_d);
+	_q_trans_sp.copyTo(_v_att_sp->q_d);
 	_v_att_sp->q_d_valid = true;
 
 	_v_att_sp->timestamp = hrt_absolute_time();

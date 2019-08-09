@@ -71,6 +71,7 @@ public:
 
 	void run_sysidt_state_machine();
 	void update_sysidt_state();
+	void update_axis_vector();
 
 	//virtual float control_vertical_speed(float vz, float vz_cmd);
 	virtual float control_sideslip();
@@ -158,8 +159,9 @@ private:
 
 	matrix::Quatf _q_trans_start;
 	matrix::Quatf _q_trans_sp;
-	matrix::Vector3f _trans_rot_axis;
+	matrix::Vector3f _trans_pitch_axis;
 	matrix::Vector3f _trans_roll_axis;
+	matrix::Vector3f _trans_yaw_axis;
 
 	float POINT_ACTION[2][POINT_NUM] = {
 	{0.0f, 2.5f, 3.0f, 3.5f},
@@ -177,6 +179,9 @@ private:
 	float _trans_start_yaw;
 	float _CL_Degree[NUM_CL_POINTS+1];
 	float _target_alt;
+	float _yaw;
+	float _pitch;
+	float _roll;
 
 	void parameters_update() override;
 
