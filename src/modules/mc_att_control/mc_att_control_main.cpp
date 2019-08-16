@@ -60,9 +60,12 @@
 #define AXIS_INDEX_YAW 2
 #define AXIS_COUNT 3
 
+#define RAD_TO_DEG(x) ((x) / 3.1416f * 180.0f)
+#define DEG_TO_RAD(x) ((x) / 180.0f * 3.1416f)
+
 using namespace matrix;
 
-//static orb_advert_t mavlink_log_pub = nullptr;
+static orb_advert_t mavlink_log_pub = nullptr;
 
 int MulticopterAttitudeControl::print_usage(const char *reason)
 {
@@ -315,6 +318,18 @@ MulticopterAttitudeControl::battery_status_poll()
 
 	if (updated) {
 		orb_copy(ORB_ID(battery_status), _battery_status_sub, &_battery_status);
+	}
+}
+
+void
+MulticopterAttitudeControl::vehicle_local_pos_poll()
+{
+	bool updated;
+	/* Check if parameters have changed */
+	orb_check(_local_pos_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(vehicle_local_position), _local_pos_sub, &_local_pos);
 	}
 }
 
@@ -593,17 +608,59 @@ MulticopterAttitudeControl::control_attitude()
 	Vector3f eq = 2.f * math::signNoZero(qe(0)) * qe.imag();
 
 	/* calculate angular rates setpoint */
-	_rates_sp = eq.emult(attitude_gain);
+	if (_vehicle_status.in_transition_to_fw)
+	{
+		Eulerf_zxy q_zxy(Quatf(_v_att.q));
+		Eulerf_zxy qd_zxy(Quatf(_v_att_sp.q_d));
 
-	/* Feed forward the yaw setpoint rate.
-	 * yaw_sp_move_rate is the feed forward commanded rotation around the world z-axis,
-	 * but we need to apply it in the body frame (because _rates_sp is expressed in the body frame).
-	 * Therefore we infer the world z-axis (expressed in the body frame) by taking the last column of R.transposed (== q.inversed)
-	 * and multiply it by the yaw setpoint rate (yaw_sp_move_rate).
-	 * This yields a vector representing the commanded rotatation around the world z-axis expressed in the body frame
-	 * such that it can be added to the rates setpoint.
-	 */
-	_rates_sp += q.inversed().dcm_z() * _v_att_sp.yaw_sp_move_rate;
+		Vector3f euler_fdb(q_zxy.phi(), q_zxy.theta(), q_zxy.psi());
+		Vector3f euler_sp(_v_att_sp.roll_body, _v_att_sp.pitch_body, _v_att_sp.yaw_body);
+
+		eq = euler_sp - euler_fdb;
+
+		Vector3f euler_rate_sp = eq.emult(attitude_gain);
+
+		/** yaw **/
+		float horiz_vel = sqrtf((_local_pos.vx * _local_pos.vx) + (_local_pos.vy * _local_pos.vy));
+		float yawrate_sp = q_zxy.phi() * CONSTANTS_ONE_G / math::constrain(horiz_vel, 3.0f, 25.0f);
+
+		float rollrate_sp  = euler_rate_sp(0);
+		float pitchrate_sp = euler_rate_sp(1);
+		yawrate_sp         = math::constrain(yawrate_sp, - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
+
+		_rate_ctrl_status.rollspeed_i_sp = rollrate_sp;
+		_rate_ctrl_status.pitchspeed_i_sp = pitchrate_sp;
+		_rate_ctrl_status.yawspeed_i_sp = yawrate_sp;
+
+		_rates_sp(0) = rollrate_sp * cosf(q_zxy.theta()) - yawrate_sp * cosf(q_zxy.phi()) * sinf(q_zxy.theta());
+		_rates_sp(1) = pitchrate_sp + yawrate_sp * sinf(q_zxy.phi());
+		_rates_sp(2) = rollrate_sp * sinf(q_zxy.theta()) + yawrate_sp;
+
+		static int ii = 0;
+		ii ++;
+		if ((ii % 100) == 0)
+		{
+			mavlink_log_critical(&mavlink_log_pub, "iner: rollrate %.4f pitchrate %.4f yawrate %.4f", double(eq(0)), double(eq(1)), double(eq(2)));
+			mavlink_log_critical(&mavlink_log_pub, "ratesp: roll %.4f pitch %.4f yaw %.4f", double(_rates_sp(0)), double(_rates_sp(1)), double(_rates_sp(2)));
+		}
+
+	}
+	else
+	{
+		_rates_sp = eq.emult(attitude_gain);
+
+		/* Feed forward the yaw setpoint rate.
+		 * yaw_sp_move_rate is the feed forward commanded rotation around the world z-axis,
+		 * but we need to apply it in the body frame (because _rates_sp is expressed in the body frame).
+		 * Therefore we infer the world z-axis (expressed in the body frame) by taking the last column of R.transposed (== q.inversed)
+		 * and multiply it by the yaw setpoint rate (yaw_sp_move_rate).
+		 * This yields a vector representing the commanded rotatation around the world z-axis expressed in the body frame
+		 * such that it can be added to the rates setpoint.
+		 */
+
+		float yawspeed_sp = 0.0f;//q.dcm_z() *_rates_sp;
+		_rates_sp += q.inversed().dcm_z() * (_v_att_sp.yaw_sp_move_rate - yawspeed_sp);
+	}
 
 	/* limit rates */
 	for (int i = 0; i < 3; i++) {
@@ -696,6 +753,34 @@ MulticopterAttitudeControl::control_attitude_rates(float dt)
 	/* apply low-pass filtering to the rates for D-term */
 	Vector3f rates_filtered(_lp_filters_d.apply(rates));
 
+	Eulerf_zxy q_zxy(Quatf(_v_att.q));
+
+	float roll  = q_zxy.phi();
+	float pitch = q_zxy.theta();
+	//float yaw   = q_zxy.psi();
+
+	matrix::Matrix<float, 3, 3> Jacob_inv;
+
+	Jacob_inv(0,0) = cosf(pitch);
+	Jacob_inv(0,1) = 0.0f;
+	Jacob_inv(0,2) = sinf(pitch);
+	Jacob_inv(1,0) = (sinf(pitch)*sinf(roll))/cosf(roll);
+	Jacob_inv(1,1) = 1.0f;
+	Jacob_inv(1,2) = -(cosf(pitch)*sinf(roll))/cosf(roll);
+	Jacob_inv(2,0) = -sinf(pitch)/cosf(roll);
+	Jacob_inv(2,1) = 0.0f;
+	Jacob_inv(2,2) = cosf(pitch)/cosf(roll);
+	
+	Vector3f euler_rates = Jacob_inv * rates;
+
+	_rate_ctrl_status.rollspeed_i  = euler_rates(0) ;
+	_rate_ctrl_status.pitchspeed_i = euler_rates(1);
+	_rate_ctrl_status.yawspeed_i   = euler_rates(2);
+
+	_rate_ctrl_status.rollspeed_b_sp  = _rates_sp(0);
+	_rate_ctrl_status.pitchspeed_b_sp = _rates_sp(1);
+	_rate_ctrl_status.yawspeed_b_sp   = _rates_sp(2);
+
 	/* angular rates error */
 	Vector3f rates_err = _rates_sp - rates;
 
@@ -767,15 +852,14 @@ MulticopterAttitudeControl::publish_rates_setpoint()
 void
 MulticopterAttitudeControl::publish_rate_controller_status()
 {
-	rate_ctrl_status_s rate_ctrl_status;
-	rate_ctrl_status.timestamp = hrt_absolute_time();
-	rate_ctrl_status.rollspeed = _rates_prev(0);
-	rate_ctrl_status.pitchspeed = _rates_prev(1);
-	rate_ctrl_status.yawspeed = _rates_prev(2);
-	rate_ctrl_status.rollspeed_integ = _rates_int(0);
-	rate_ctrl_status.pitchspeed_integ = _rates_int(1);
-	rate_ctrl_status.yawspeed_integ = _rates_int(2);
-	orb_publish_auto(ORB_ID(rate_ctrl_status), &_controller_status_pub, &rate_ctrl_status, nullptr, ORB_PRIO_DEFAULT);
+	_rate_ctrl_status.timestamp = hrt_absolute_time();
+	_rate_ctrl_status.rollspeed = _rates_prev(0);
+	_rate_ctrl_status.pitchspeed = _rates_prev(1);
+	_rate_ctrl_status.yawspeed = _rates_prev(2);
+	_rate_ctrl_status.rollspeed_integ = _rates_int(0);
+	_rate_ctrl_status.pitchspeed_integ = _rates_int(1);
+	_rate_ctrl_status.yawspeed_integ = _rates_int(2);
+	orb_publish_auto(ORB_ID(rate_ctrl_status), &_controller_status_pub, &_rate_ctrl_status, nullptr, ORB_PRIO_DEFAULT);
 }
 
 void
@@ -810,6 +894,7 @@ MulticopterAttitudeControl::run()
 	 */
 	_v_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_v_att_sp_sub = orb_subscribe(ORB_ID(vehicle_attitude_setpoint));
+	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
 	_v_rates_sp_sub = orb_subscribe(ORB_ID(vehicle_rates_setpoint));
 	_v_control_mode_sub = orb_subscribe(ORB_ID(vehicle_control_mode));
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
@@ -897,6 +982,7 @@ MulticopterAttitudeControl::run()
 			vehicle_status_poll();
 			vehicle_motor_limits_poll();
 			battery_status_poll();
+			vehicle_local_pos_poll();
 			sensor_correction_poll();
 			sensor_bias_poll();
 			vehicle_land_detected_poll();

@@ -347,7 +347,8 @@ float ILC_in(float time_since_trans_start)
 *  To smooth the step trajectory, the acceleration interval will be generated from a 
 *  sigmoid function.
 */
-float Tailsitter::calc_vz_cmd(float time_since_trans_start){
+float Tailsitter::calc_vz_cmd(float time_since_trans_start)
+{
 	int vz_cmd_index;
 	float vz_change_period, current_vz_cmd, time_in_perioid;
 	float k_sigmoid = 20 / _params->vt_vz_acctime, time_in_sigmoid = 0, sigmoid_value = 0;
@@ -376,7 +377,7 @@ float Tailsitter::calc_vz_cmd(float time_since_trans_start){
 	return -current_vz_cmd;
 }
 
-float Tailsitter::control_sideslip()
+float Tailsitter::control_sideslip(float dt)
 {
 	if(_params->vt_sideslip_ctrl_en)
 	{
@@ -393,9 +394,33 @@ float Tailsitter::control_sideslip()
 			roll_exceeding_treshold = _trans_roll_rot + min_roll_rad;
 		}
 
-		float horiz_vel = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));;
-		float sideslip_gain = 9.8f / math::constrain(horiz_vel, 3.0f, 25.0f);
-		return math::constrain(roll_exceeding_treshold * sideslip_gain, - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
+		float horiz_vel = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));
+		float sideslip_gain = 0.0f;
+
+		switch (_vtol_sysidt.state)
+		{
+			case TRIM_FLIGHT :
+				sideslip_gain = 0.2f;
+				break;
+			case TURN_FLIGHT :
+				sideslip_gain = 9.8f / math::constrain(horiz_vel, 3.0f, 25.0f);
+				break;
+		}
+
+		float vx = _local_pos->vx;
+		float vy = _local_pos->vy;
+		float vel_ang = atan2f(vy, vx);
+		_vtol_vehicle_status->sideslip_ang = vel_ang - _yaw;
+
+		float yawrate_sp = math::constrain(roll_exceeding_treshold * sideslip_gain, - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
+		//yawrate_sp = 0.0f;
+		_yaw += dt * yawrate_sp;
+		if(_yaw >= DEG_TO_RAD(180.0f))
+		{
+			_yaw -= DEG_TO_RAD(360.f);
+		}
+
+		//return math::constrain(roll_exceeding_treshold * sideslip_gain, - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
 	}
 	return 0.0f;
 }
@@ -472,7 +497,7 @@ float Tailsitter::calc_pitch_rot(float time_since_trans_start) {
 	return angle;
 }
 
-void Tailsitter::calc_q_trans_sp()
+float Tailsitter::calc_roll_sp()
 {
 	float lateral_dist, lateral_v;
 	//float longitudinal_dist, longitudinal_v, pitchrot;
@@ -484,7 +509,7 @@ void Tailsitter::calc_q_trans_sp()
 	float now, dt;
 
 	now = float(hrt_absolute_time()) * 1e-6f;
-	dt = now - _VY_PID_Control.last_run;
+	dt  = now - _VY_PID_Control.last_run;
 	_VY_PID_Control.last_run = now;
 	_VX_PID_Control.last_run = now;
 
@@ -516,41 +541,11 @@ void Tailsitter::calc_q_trans_sp()
 		_VY_PID_Control.is_saturated = true;
 	} else {
 		_VY_PID_Control.is_saturated = false;
-	}	
-	_trans_roll_rot  = math::constrain(rollrot, -0.3f, 0.3f);
-
-	// PI controller of longitudinal dist
-	/*
-	Kp = _params->vt_x_dist_kp;
-	Kvp = _params->vt_vx_kp;
-	Kvi = _params->vt_vx_ki;
-
-	if (_VX_PID_Control.is_saturated){
-		Kvi = 0;
 	}
-
-	v_cmd = -Kp * longitudinal_dist;
-	_vtol_vehicle_status->vx_cmd = v_cmd;
-	v_error = (v_cmd - longitudinal_v);
-	P_output = Kvp * v_error;
-	I_output = _VX_PID_Control.last_I_state + (-Kvi) * v_error * dt;
-	pitchrot = P_output + I_output;	
-	if (fabsf(pitchrot) > 0.15f){
-		_VX_PID_Control.is_saturated = true;
-	} else {
-		_VX_PID_Control.is_saturated = false;
-	}	
-	_trans_pitch_rot = math::constrain(pitchrot, -0.15f,0.15f);
-	
-	_vtol_vehicle_status->longitudinal_dist = longitudinal_dist;
-	_vtol_vehicle_status->longitudinal_v 	= longitudinal_v;	
-	*/	
 
 	_vtol_vehicle_status->lat_dist      = lateral_dist;
 	_vtol_vehicle_status->lateral_v 	= lateral_v;
-
-	//_q_trans_sp = Quatf(AxisAnglef(_trans_pitch_axis, _trans_pitch_rot)) * Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot)) * _q_trans_start;
-	_q_trans_sp = Eulerf(_trans_roll_rot, -_trans_pitch_rot, _yaw);
+	return math::constrain(rollrot, -0.3f, 0.3f);
 }
 
 void Tailsitter::State_Machine_Initialize(){
@@ -572,9 +567,10 @@ bool Tailsitter::is_ground_speed_satisfied(){
 
 	if (fabsf(delta_angle) < 1.0f)
 	{
-		_trans_start_x = _local_pos->x;
-		_trans_start_y = _local_pos->y;
+		_trans_start_x   = _local_pos->x;
+		_trans_start_y   = _local_pos->y;
 		_trans_start_yaw = (_trans_start_yaw >= DEG_TO_RAD(180.0f)) ? (_trans_start_yaw - DEG_TO_RAD(180.0f)) : (_trans_start_yaw + DEG_TO_RAD(180.0f));
+		_yaw             = Eulerf_zxy(Quatf(_v_att->q)).psi();
 		return (true);
 	}
 	else return (false);
@@ -645,14 +641,12 @@ void Tailsitter::run_sysidt_state_machine(){
 			POINT_ACTION[1][0] = get_theta_cmd();
 			_trans_pitch_rot = DEG_TO_RAD(POINT_ACTION[1][0]);
 		}
-		_trans_roll_rot = 0.0f;
-		calc_q_trans_sp();
+		_trans_roll_rot = calc_roll_sp();
 		break;
 	case TURN_FLIGHT:
 		_trans_pitch_rot = DEG_TO_RAD(get_theta_cmd());
-		_trans_roll_rot = DEG_TO_RAD(_params->sysidt_roll);
-		//_q_trans_sp = Quatf(AxisAnglef(_trans_pitch_axis, _trans_pitch_rot)) * Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot)) * _q_trans_start;		
-		_q_trans_sp = Eulerf(_trans_roll_rot, -_trans_pitch_rot, _yaw);
+		_trans_roll_rot = DEG_TO_RAD(_params->sysidt_roll);		
+		//_q_trans_sp = Eulerf(_trans_roll_rot, -_trans_pitch_rot, _yaw);
 		break;
 	}
 	update_sysidt_state();
@@ -661,25 +655,19 @@ void Tailsitter::run_sysidt_state_machine(){
 
 void Tailsitter::update_axis_vector()
 {
-	Vector3f x = Dcmf(Quatf(_v_att->q)) * Vector3f(1, 0, 0);
-	_trans_pitch_axis = -x.cross(Vector3f(0, 0, -1));
-	_trans_roll_axis  = _trans_pitch_axis.cross(Vector3f(0, 0, -1));
+	//Vector3f x = Dcmf(Quatf(_v_att->q)) * Vector3f(1, 0, 0);
+	//Vector3f z = Dcmf(Quatf(_v_att->q)) * Vector3f(0, 0, -1);
+	_trans_pitch_axis = Vector3f(0, 1, 0);
+	_trans_roll_axis  = Vector3f(1, 0, 0);
 
-	_yaw = Eulerf(Quatf(_v_att->q)).psi();
-
-	_q_trans_start = Eulerf(0.0f, 0.0f, Eulerf(Quatf(_v_att->q)).psi());
-	
-	static int ii = 0;
-	ii ++;
-	if ((ii % 100) == 0)
-	{
-		mavlink_log_critical(&mavlink_log_pub, "calulated yaw: %.5f actual yaw: %.5f", double(_yaw), double(Eulerf(Quatf(_v_att->q)).psi()));
-	}
+	//_yaw = Eulerf_zxy(Quatf(_v_att->q)).psi();
 }
 
 void Tailsitter::update_transition_state()
 {
 	float time_since_trans_start = (float)(hrt_absolute_time() - _vtol_schedule.f_trans_start_t) * 1e-6f;
+	float dt = (float)(hrt_absolute_time()) * 1e-6f - _last_run_time;
+	_last_run_time = (float)(hrt_absolute_time()) * 1e-6f;
 
 	/** check mode **/
 	if(_vtol_mode != TRANSITION_TO_FW)
@@ -693,23 +681,20 @@ void Tailsitter::update_transition_state()
 	{
 		_flag_was_in_trans_mode = true;
 
-		Vector3f x        = Dcmf(Quatf(_v_att->q)) * Vector3f(1, 0, 0);
-		_trans_pitch_axis = -x.cross(Vector3f(0, 0, -1));
-		_trans_roll_axis  = _trans_pitch_axis.cross(Vector3f(0, 0, -1));
-		_q_trans_start  = Eulerf(0.0f, 0.0f, _mc_virtual_att_sp->yaw_body);
-
+		update_axis_vector();
 		PID_Initialize();
 		State_Machine_Initialize();
-		_q_trans_sp      = _q_trans_start;
 		_alt_sp          = _local_pos->z;
 		_trans_start_y = _local_pos->y;
 		_trans_start_x = _local_pos->x;
-		_trans_start_yaw = _mc_virtual_att_sp->yaw_body;
-		_v_att_sp->yaw_body = _mc_virtual_att_sp->yaw_body;
+		_yaw = Eulerf_zxy(Quatf(_v_att->q)).psi();
+		_trans_start_yaw = _yaw;
+		dt = 0.0f;
 
 		_mc_hover_thrust = _v_att_sp->thrust_body[2];
 		_vert_i_term = 0.0f;
 		_vtol_vehicle_status->bx_acc_i = 0.0f;
+		_trans_roll_rot  = 0.0f;
 		_trans_pitch_rot = 0.0f;
 	}
 
@@ -727,7 +712,7 @@ void Tailsitter::update_transition_state()
 			//calc_q_trans_sp();
 
 			/* sideslip control */
-			_v_att_sp->yaw_sp_move_rate = control_sideslip();
+			_v_att_sp->yaw_sp_move_rate = control_sideslip(dt);
 
 			/* Altitude control */
 			_v_att_sp->thrust_body[2] = control_altitude(time_since_trans_start, _alt_sp, VERT_CONTROL_MODE);
@@ -740,21 +725,27 @@ void Tailsitter::update_transition_state()
 		default:
 			break;
 	}
-
+	_q_trans_start = Eulerf(0.0f, 0.0f, _yaw);
+	_q_trans_sp = _q_trans_start * Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot)) * Quatf(AxisAnglef(_trans_pitch_axis, -_trans_pitch_rot));
 	send_atti_sp();
+
+	static int ii = 0;
+	//ii ++;
+	if ((ii % 100) == 1)
+	{
+		mavlink_log_critical(&mavlink_log_pub, "calulated yaw: %.4f current yaw: %.4f", double(_yaw), double(Eulerf_zxy(Quatf(_v_att->q)).psi()));
+	}
+
 }
 
 void Tailsitter::send_atti_sp()
 {
-	const Eulerf euler_sp(_q_trans_sp);
-
-	_v_att_sp->roll_body  = euler_sp.phi();
-	_v_att_sp->pitch_body = euler_sp.theta();
-	_v_att_sp->yaw_body   = euler_sp.psi();
+	_v_att_sp->roll_body  = _trans_roll_rot;
+	_v_att_sp->pitch_body = -_trans_pitch_rot;
+	_v_att_sp->yaw_body   = _yaw;
 
 	_q_trans_sp.copyTo(_v_att_sp->q_d);
 	_v_att_sp->q_d_valid = true;
-
 	_v_att_sp->timestamp = hrt_absolute_time();
 }
 
@@ -896,7 +887,7 @@ void Tailsitter::fill_actuator_outputs()
 		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
 
-		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL]  = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
-		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = _actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim;	// pitch elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL]  = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];	// roll elevon
+		//_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim;	// pitch elevon
 	}
 }

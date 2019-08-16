@@ -36,6 +36,7 @@
 #include <mathlib/math/filter/NotchFilter.hpp>
 #include <matrix/matrix/math.hpp>
 #include <perf/perf_counter.h>
+#include <modules/vtol_att_control/euler_zxy.h>
 #include <px4_config.h>
 #include <px4_defines.h>
 #include <px4_module.h>
@@ -58,6 +59,7 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/landing_gear.h>
+#include <uORB/topics/vehicle_local_position.h>
 
 /**
  * Multicopter attitude control app start / stop handling function
@@ -100,6 +102,7 @@ private:
 	 * Check for parameter update and handle it.
 	 */
 	void		battery_status_poll();
+	void        vehicle_local_pos_poll();
 	void		parameter_update_poll();
 	void		sensor_bias_poll();
 	void		vehicle_land_detected_poll();
@@ -149,6 +152,7 @@ private:
 
 	int		_v_att_sub{-1};			/**< vehicle attitude subscription */
 	int		_v_att_sp_sub{-1};		/**< vehicle attitude setpoint subscription */
+	int     _local_pos_sub{-1};
 	int		_v_rates_sp_sub{-1};		/**< vehicle rates setpoint subscription */
 	int		_v_control_mode_sub{-1};	/**< vehicle control mode subscription */
 	int		_params_sub{-1};		/**< parameter updates subscription */
@@ -178,6 +182,7 @@ private:
 	struct vehicle_attitude_s		_v_att {};		/**< vehicle attitude */
 	struct vehicle_attitude_setpoint_s	_v_att_sp {};		/**< vehicle attitude setpoint */
 	struct vehicle_rates_setpoint_s		_v_rates_sp {};		/**< vehicle rates setpoint */
+	struct rate_ctrl_status_s           _rate_ctrl_status {};
 	struct manual_control_setpoint_s	_manual_control_sp {};	/**< manual control setpoint */
 	struct vehicle_control_mode_s		_v_control_mode {};	/**< vehicle control mode */
 	struct actuator_controls_s		_actuators {};		/**< actuator controls */
@@ -188,6 +193,7 @@ private:
 	struct sensor_bias_s			_sensor_bias {};	/**< sensor in-run bias corrections */
 	struct vehicle_land_detected_s		_vehicle_land_detected {};
 	struct landing_gear_s 			_landing_gear {};
+	struct vehicle_local_position_s _local_pos{};
 
 	MultirotorMixer::saturation_status _saturation_status{};
 

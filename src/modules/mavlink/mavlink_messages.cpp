@@ -50,6 +50,7 @@
 #include <lib/ecl/geo/geo.h>
 #include <lib/mathlib/mathlib.h>
 #include <lib/matrix/matrix/math.hpp>
+#include <modules/vtol_att_control/euler_zxy.h>
 #include <px4_time.h>
 #include <systemlib/mavlink_log.h>
 
@@ -1097,7 +1098,8 @@ protected:
 
 		if (_att_sub->update(&_att_time, &att)) {
 			mavlink_attitude_t msg = {};
-			matrix::Eulerf euler = matrix::Quatf(att.q);
+			//matrix::Eulerf euler = matrix::Quatf(att.q);
+			matrix::Eulerf_zxy euler = matrix::Eulerf_zxy(matrix::Quatf(att.q));
 			msg.time_boot_ms = att.timestamp / 1000;
 			msg.roll = euler.phi();
 			msg.pitch = euler.theta();

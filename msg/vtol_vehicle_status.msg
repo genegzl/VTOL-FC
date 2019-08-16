@@ -25,6 +25,7 @@ float32 pitchrot
 float32 longitudinal_dist
 float32 lateral_v
 float32 longitudinal_v
+float32 sideslip_ang
 float32 vz_cmd
 float32 vy_cmd
 float32 vx_cmd

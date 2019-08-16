@@ -44,6 +44,7 @@
 
 #include "vtol_type.h"
 #include "ILC_DATA.h"
+#include "euler_zxy.h"
 #include <perf/perf_counter.h>  /** is it necsacery? **/
 #include <parameters/param.h>
 #include <drivers/drv_hrt.h>
@@ -64,7 +65,7 @@ public:
 	void fill_actuator_outputs() override;
 	void waiting_on_tecs() override;
 
-	virtual void calc_q_trans_sp();
+	virtual float calc_roll_sp();
 	virtual void send_atti_sp();
 	virtual void PID_Initialize();
 	virtual void State_Machine_Initialize();
@@ -74,7 +75,7 @@ public:
 	void update_axis_vector();
 
 	//virtual float control_vertical_speed(float vz, float vz_cmd);
-	virtual float control_sideslip();
+	virtual float control_sideslip(float dt);
 	virtual float calc_vz_cmd(float time_since_trans_start);
 	virtual float control_altitude(float time_since_trans_start, float alt_cmd, int control_loop_mode);
 	virtual float control_vertical_acc(float time_since_trans_start, float vert_acc_cmd, float vert_vel_cmd);
@@ -165,10 +166,11 @@ private:
 
 	float POINT_ACTION[2][POINT_NUM] = {
 	{0.0f, 2.5f, 3.0f, 3.5f},
-	{0.0f, 50.0f, 50.0f, 50.0f}
+	{0.0f, 80.0f, 80.0f, 80.0f}
 	};
 
 	float _alt_sp;
+	float _last_run_time;
 	float _vert_i_term;
 	float _mc_hover_thrust;
 	float _trans_end_thrust;
