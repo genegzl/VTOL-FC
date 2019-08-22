@@ -624,8 +624,8 @@ MulticopterAttitudeControl::control_attitude()
 		float horiz_vel = sqrtf((_local_pos.vx * _local_pos.vx) + (_local_pos.vy * _local_pos.vy));
 		float yawrate_sp = q_zxy.phi() * CONSTANTS_ONE_G / math::constrain(horiz_vel, 3.0f, 25.0f);
 
-		float rollrate_sp  = euler_rate_sp(0);
-		float pitchrate_sp = euler_rate_sp(1);
+		float rollrate_sp  = math::constrain(euler_rate_sp(0), - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
+		float pitchrate_sp = math::constrain(euler_rate_sp(1), - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
 		yawrate_sp         = math::constrain(yawrate_sp, - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
 
 		_rate_ctrl_status.rollspeed_i_sp = rollrate_sp;
@@ -764,16 +764,19 @@ MulticopterAttitudeControl::control_attitude_rates(float dt)
 	Jacob_inv(0,0) = cosf(pitch);
 	Jacob_inv(0,1) = 0.0f;
 	Jacob_inv(0,2) = sinf(pitch);
-	Jacob_inv(1,0) = (sinf(pitch)*sinf(roll))/cosf(roll);
+	Jacob_inv(1,0) = sinf(pitch)*tanf(roll);
 	Jacob_inv(1,1) = 1.0f;
-	Jacob_inv(1,2) = -(cosf(pitch)*sinf(roll))/cosf(roll);
+	Jacob_inv(1,2) = -cosf(pitch)*tanf(roll);
 	Jacob_inv(2,0) = -sinf(pitch)/cosf(roll);
 	Jacob_inv(2,1) = 0.0f;
 	Jacob_inv(2,2) = cosf(pitch)/cosf(roll);
 	
 	Vector3f euler_rates = Jacob_inv * rates;
+	//euler_rates(0) = Jacob_inv(0,0) * rates(0) + Jacob_inv(0,1) * rates(1) + Jacob_inv(0,2) * rates(2);
+	//euler_rates(1) = Jacob_inv(1,0) * rates(0) + Jacob_inv(1,1) * rates(1) + Jacob_inv(1,2) * rates(2);
+	//euler_rates(2) = Jacob_inv(2,0) * rates(0) + Jacob_inv(2,1) * rates(1) + Jacob_inv(2,2) * rates(2);
 
-	_rate_ctrl_status.rollspeed_i  = euler_rates(0) ;
+	_rate_ctrl_status.rollspeed_i  = euler_rates(0);
 	_rate_ctrl_status.pitchspeed_i = euler_rates(1);
 	_rate_ctrl_status.yawspeed_i   = euler_rates(2);
 
