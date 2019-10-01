@@ -35,6 +35,8 @@ cmake_minimum_required(VERSION 3.0)
 
 project(ECL CXX)
 
+file(MAKE_DIRECTORY  ${CMAKE_CURRENT_LIST_DIR}/.git)
+
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
     message(STATUS "set build type to ${CMAKE_BUILD_TYPE}")
