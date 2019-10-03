@@ -608,7 +608,7 @@ MulticopterAttitudeControl::control_attitude()
 	Vector3f eq = 2.f * math::signNoZero(qe(0)) * qe.imag();
 
 	/* calculate angular rates setpoint */
-	if (_vehicle_status.in_transition_to_fw)
+	if (_vehicle_status.in_transition_to_fw || !_vehicle_status.is_rotary_wing)
 	{
 		Eulerf_zxy q_zxy(Quatf(_v_att.q));
 		Eulerf_zxy qd_zxy(Quatf(_v_att_sp.q_d));
@@ -637,11 +637,10 @@ MulticopterAttitudeControl::control_attitude()
 		_rates_sp(2) = rollrate_sp * sinf(q_zxy.theta()) + yawrate_sp;
 
 		static int ii = 0;
-		ii ++;
-		if ((ii % 100) == 0)
+		if ((ii % 100) == 2)
 		{
 			mavlink_log_critical(&mavlink_log_pub, "iner: rollrate %.4f pitchrate %.4f yawrate %.4f", double(eq(0)), double(eq(1)), double(eq(2)));
-			mavlink_log_critical(&mavlink_log_pub, "ratesp: roll %.4f pitch %.4f yaw %.4f", double(_rates_sp(0)), double(_rates_sp(1)), double(_rates_sp(2)));
+			mavlink_log_critical(&mavlink_log_pub, "attsp: roll %.4f pitch %.4f yaw %.4f", double(_rates_sp(0)), double(_rates_sp(1)), double(_rates_sp(2)));
 		}
 
 	}
@@ -1005,7 +1004,7 @@ MulticopterAttitudeControl::run()
 
 			bool attitude_setpoint_generated = false;
 
-			if (_v_control_mode.flag_control_attitude_enabled && _vehicle_status.is_rotary_wing) {
+			if (_v_control_mode.flag_control_attitude_enabled) {
 				if (attitude_updated) {
 					// Generate the attitude setpoint from stick inputs if we are in Manual/Stabilized mode
 					if (_v_control_mode.flag_control_manual_enabled &&
@@ -1022,7 +1021,7 @@ MulticopterAttitudeControl::run()
 
 			} else {
 				/* attitude controller disabled, poll rates setpoint topic */
-				if (_v_control_mode.flag_control_manual_enabled && _vehicle_status.is_rotary_wing) {
+				if (_v_control_mode.flag_control_manual_enabled) {
 					if (manual_control_updated) {
 						/* manual rates control - ACRO mode */
 						Vector3f man_rate_sp(

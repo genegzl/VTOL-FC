@@ -184,10 +184,9 @@ void Tailsitter::update_vtol_state()
 				// check if we have reached airspeed  and the transition time is over the setpoint to switch to TRANSITION P2 mode
 				
 				if ((airspeed_condition_satisfied && (time_since_trans_start >= _params->front_trans_duration)) || can_transition_on_ground()) {
-					//_vtol_schedule.flight_mode = FW_MODE;
-					_vtol_schedule.flight_mode = MC_MODE;
+					_vtol_schedule.flight_mode = FW_MODE;
+					//_vtol_schedule.flight_mode = MC_MODE;
 				}
-				
 
 				break;
 			}
@@ -222,7 +221,6 @@ void Tailsitter::update_vtol_state()
 	case FW_MODE:
 		_vtol_mode = FIXED_WING;
 		_vtol_vehicle_status->vtol_in_trans_mode = false;
-		_flag_was_in_trans_mode = false;
 		break;
 
 	case TRANSITION_FRONT_P1:
@@ -595,28 +593,22 @@ void Tailsitter::update_sysidt_state(){
 
 	case TRIM_FLIGHT:
 		/* Global counter */
-		if (_vtol_sysidt.global_counter >= _params->sysidt_counter)
-			_vtol_sysidt.state = SYSIDT_LOCK;
-		else {
-			if (now - _vtol_sysidt.trim_timer >= _params->sysidt_acctime + _params->sysidt_pitchtime){
-				_vtol_sysidt.state = TURN_FLIGHT;
-				_vtol_sysidt.trim_counter += 1;
-			}
+		if (now - _vtol_sysidt.trim_timer >= _params->sysidt_acctime)
+		{
+			_vtol_sysidt.state = TURN_FLIGHT;
+			_vtol_sysidt.trim_counter += 1;
 		}
 		break;
 
 	case TURN_FLIGHT:
-		if (_vtol_sysidt.global_counter >= _params->sysidt_counter)
-			_vtol_sysidt.state = SYSIDT_LOCK;
-		else {
-			if (is_ground_speed_satisfied()){
-				_vtol_sysidt.state = TRIM_FLIGHT;			
-				_vtol_sysidt.turn_counter += 1;
-				_vtol_sysidt.is_accelerated = false;
-				_trans_start_y = _local_pos->y;
-				_trans_start_x = _local_pos->x;	
-				_vtol_sysidt.trim_timer = now;	
-			}
+		if (is_ground_speed_satisfied())
+		{
+			_vtol_sysidt.state = TRIM_FLIGHT;
+			_vtol_sysidt.turn_counter += 1;
+			_vtol_sysidt.is_accelerated = false;
+			_trans_start_y = _local_pos->y;
+			_trans_start_x = _local_pos->x;
+			_vtol_sysidt.trim_timer = now;
 		}
 		break;
 	}
@@ -638,13 +630,13 @@ void Tailsitter::run_sysidt_state_machine(){
 		if (now - _vtol_sysidt.trim_timer <= _params->sysidt_acctime){
 			_trans_pitch_rot = calc_pitch_rot(now - _vtol_sysidt.trim_timer);
 		} else {
-			POINT_ACTION[1][0] = get_theta_cmd();
+			POINT_ACTION[1][0] = 82.0f;//get_theta_cmd();
 			_trans_pitch_rot = DEG_TO_RAD(POINT_ACTION[1][0]);
 		}
 		_trans_roll_rot = calc_roll_sp();
 		break;
 	case TURN_FLIGHT:
-		_trans_pitch_rot = DEG_TO_RAD(get_theta_cmd());
+		_trans_pitch_rot = DEG_TO_RAD(82.0f);//DEG_TO_RAD(get_theta_cmd());
 		_trans_roll_rot = DEG_TO_RAD(_params->sysidt_roll);		
 		//_q_trans_sp = Eulerf(_trans_roll_rot, -_trans_pitch_rot, _yaw);
 		break;
@@ -670,7 +662,7 @@ void Tailsitter::update_transition_state()
 	_last_run_time = (float)(hrt_absolute_time()) * 1e-6f;
 
 	/** check mode **/
-	if(_vtol_mode != TRANSITION_TO_FW)
+	if((_vtol_mode != TRANSITION_TO_FW) && (_vtol_mode != FIXED_WING))
 	{
 		_vtol_mode = ROTARY_WING;
 		return;
@@ -703,6 +695,7 @@ void Tailsitter::update_transition_state()
 	/** Front Trans Control **/
 	switch (_vtol_schedule.flight_mode)
 	{
+		case FW_MODE:
 		case TRANSITION_FRONT_P1:
 		{
 			update_axis_vector();
@@ -733,14 +726,14 @@ void Tailsitter::update_transition_state()
 	//ii ++;
 	if ((ii % 100) == 1)
 	{
-		mavlink_log_critical(&mavlink_log_pub, "calulated yaw: %.4f current yaw: %.4f", double(_yaw), double(Eulerf_zxy(Quatf(_v_att->q)).psi()));
+		mavlink_log_critical(&mavlink_log_pub, "calulated pitch sp: %.4f", double(-_trans_pitch_rot * 57.3f));
 	}
 
 }
 
 void Tailsitter::send_atti_sp()
 {
-	_v_att_sp->roll_body  = _trans_roll_rot;
+	_v_att_sp->roll_body  = _fw_virtual_att_sp->roll_body;
 	_v_att_sp->pitch_body = -_trans_pitch_rot;
 	_v_att_sp->yaw_body   = _yaw;
 
@@ -765,16 +758,13 @@ void Tailsitter::update_fw_state()
 */
 void Tailsitter::fill_actuator_outputs()
 {
-	float time_since_fw_start = 0.0f;
 	float time_since_sweep = 0.0f;
 	float sweep_signal_phase = 0.0f;
 	float sweep_signal = 0.0f;
-	float smooth_fw_start = 0.0f;
-	float smooth_pr_start = 0.0f;
 	float sweep_min_frequency = 0.5f * 6.2831f;
 	float sweep_max_frequency = 80.0f * 6.2831f ;
 	float overall_time = 150.0f;
-	float time_since_trans_start = (float)(hrt_absolute_time() - _vtol_schedule.f_trans_start_t) * 1e-6f;
+	//float time_since_trans_start = (float)(hrt_absolute_time() - _vtol_schedule.f_trans_start_t) * 1e-6f;
 
 	_actuators_out_0->timestamp = hrt_absolute_time();
 	_actuators_out_0->timestamp_sample = _actuators_mc_in->timestamp_sample;
@@ -832,47 +822,8 @@ void Tailsitter::fill_actuator_outputs()
 		break;
 
 	case FIXED_WING:
-		// at the start of the fw mode, the control output of pitch is smoothed from the end of transition
-		time_since_fw_start = (float)(hrt_absolute_time() - _vtol_schedule.fw_start) * 1e-6f;
-		smooth_fw_start = math::constrain(time_since_fw_start / 0.3f, 0.0f, 1.0f);
-		smooth_pr_start = math::constrain(time_since_fw_start / 1.5f, 0.0f, 1.0f);
-
-		if (time_since_fw_start <= 0.05f)
-		{
-			_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE] * smooth_fw_start + 0.70f * (1.0f - smooth_fw_start);
-		}
-		else if (time_since_fw_start <= 1.5f)
-		{
-			_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] =
-				_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] * smooth_pr_start
-				+ (_actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim) * (1.0f - smooth_pr_start);
-			_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] =
-				_actuators_fw_in->control[actuator_controls_s::INDEX_YAW] * smooth_pr_start
-				+ _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL] * (1.0f - smooth_pr_start);
-			_actuators_out_0->control[actuator_controls_s::INDEX_YAW] =
-				-_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL]  * smooth_pr_start
-				+ _actuators_mc_in->control[actuator_controls_s::INDEX_YAW] * (1.0f - smooth_pr_start);
-
-
-		} else{
-			_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] =
-				_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim;
-			_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] =
-				_actuators_fw_in->control[actuator_controls_s::INDEX_YAW];
-			_actuators_out_0->control[actuator_controls_s::INDEX_YAW] =
-				-_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];
-		}
-
-		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] =
-			_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE] * smooth_fw_start + 0.70f * (1.0f - smooth_fw_start);
-
-		break;
-
 	case TRANSITION_TO_FW:
 	case TRANSITION_TO_MC:
-		smooth_fw_start = math::constrain(time_since_trans_start / 2.0f, 0.0f, 1.0f);
-
 		/**
 		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] =
 			_actuators_fw_in->control[actuator_controls_s::INDEX_YAW] * smooth_fw_start + _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL] * (1.0f - smooth_fw_start);

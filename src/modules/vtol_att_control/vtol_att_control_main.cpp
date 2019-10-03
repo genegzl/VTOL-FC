@@ -749,7 +749,7 @@ void VtolAttitudeControl::task_main()
 			_vtol_type->update_mc_state();
 
 		} else if (_vtol_type->get_mode() == FIXED_WING) {
-
+			mc_virtual_att_sp_poll();
 			fw_virtual_att_sp_poll();
 
 			// vehicle is in fw mode
@@ -757,7 +757,8 @@ void VtolAttitudeControl::task_main()
 			_vtol_vehicle_status.vtol_in_trans_mode = false;
 			_vtol_vehicle_status.in_transition_to_fw = false;
 
-			_vtol_type->update_fw_state();
+			//_vtol_type->update_fw_state();
+			_vtol_type->update_transition_state();
 
 		} else if (_vtol_type->get_mode() == TRANSITION_TO_MC || _vtol_type->get_mode() == TRANSITION_TO_FW) {
 

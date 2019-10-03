@@ -635,7 +635,7 @@ void Logger::add_default_topics()
 	//add_topic("landing_target_pose");
 	add_topic("manual_control_setpoint", 200);
 	add_topic("mission",0);
-	add_topic("mission_result",100);
+	add_topic("mission_result",0);
 	//add_topic("optical_flow", 50);
 	add_topic("position_setpoint_triplet", 200);
 	add_topic("vehicle_control_mode", 0);

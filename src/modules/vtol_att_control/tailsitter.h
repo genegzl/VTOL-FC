@@ -166,7 +166,7 @@ private:
 
 	float POINT_ACTION[2][POINT_NUM] = {
 	{0.0f, 2.5f, 3.0f, 3.5f},
-	{0.0f, 80.0f, 80.0f, 80.0f}
+	{0.0f, 82.0f, 82.0f, 82.0f}
 	};
 
 	float _alt_sp;
