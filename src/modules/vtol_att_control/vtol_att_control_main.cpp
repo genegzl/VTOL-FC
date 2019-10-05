@@ -656,8 +656,9 @@ void VtolAttitudeControl::task_main()
 	_pos_sp_triplet_sub    = orb_subscribe(ORB_ID(position_setpoint_triplet));
 	_airspeed_sub          = orb_subscribe(ORB_ID(airspeed));
 	_vehicle_cmd_sub	   = orb_subscribe(ORB_ID(vehicle_command));
-	_tecs_status_sub = orb_subscribe(ORB_ID(tecs_status));
-	_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
+	_tecs_status_sub       = orb_subscribe(ORB_ID(tecs_status));
+	_land_detected_sub     = orb_subscribe(ORB_ID(vehicle_land_detected));
+	_mission_result_sub    = orb_subscribe(ORB_ID(mission_result));
 
 	_actuator_inputs_mc    = orb_subscribe(ORB_ID(actuator_controls_virtual_mc));
 	_actuator_inputs_fw    = orb_subscribe(ORB_ID(actuator_controls_virtual_fw));
@@ -770,8 +771,8 @@ void VtolAttitudeControl::task_main()
 			_vtol_vehicle_status.vtol_in_trans_mode = false;
 			_vtol_vehicle_status.in_transition_to_fw = false;
 
-			_vtol_type->update_fw_state();
-			//_vtol_type->update_transition_state();
+			//_vtol_type->update_fw_state();
+			_vtol_type->update_transition_state();
 
 		} else if (_vtol_type->get_mode() == TRANSITION_TO_MC || _vtol_type->get_mode() == TRANSITION_TO_FW) {
 
