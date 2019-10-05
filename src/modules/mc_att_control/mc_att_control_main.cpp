@@ -642,7 +642,6 @@ MulticopterAttitudeControl::control_attitude()
 			mavlink_log_critical(&mavlink_log_pub, "iner: rollrate %.4f pitchrate %.4f yawrate %.4f", double(eq(0)), double(eq(1)), double(eq(2)));
 			mavlink_log_critical(&mavlink_log_pub, "attsp: roll %.4f pitch %.4f yaw %.4f", double(_rates_sp(0)), double(_rates_sp(1)), double(_rates_sp(2)));
 		}
-
 	}
 	else
 	{

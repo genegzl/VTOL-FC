@@ -67,6 +67,7 @@ VtolType::VtolType(VtolAttitudeControl *att_controller) :
 	_land_detected = _attc->get_land_detected();
 	_params = _attc->get_params();
 	_sensor_acc = _attc->get_sensor_acc();
+	_mission_result = _attc->get_mission_result();
 
 	for (auto &pwm_max : _max_mc_pwm_values.values) {
 		pwm_max = PWM_DEFAULT_MAX;

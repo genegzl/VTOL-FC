@@ -390,6 +390,18 @@ VtolAttitudeControl::land_detected_poll()
 	}
 }
 
+void
+VtolAttitudeControl::mission_result_poll()
+{
+	bool updated;
+
+	orb_check(_mission_result_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(mission_result), _mission_result_sub, &_mission_result);
+	}
+}
+
 /**
 * Check received command
 */
@@ -708,6 +720,7 @@ void VtolAttitudeControl::task_main()
 		vehicle_local_pos_poll();
 		vehicle_local_pos_sp_poll();
 		sensor_acc_poll();
+		mission_result_poll();
 		pos_sp_triplet_poll();
 		vehicle_airspeed_poll();
 		vehicle_cmd_poll();
@@ -757,8 +770,8 @@ void VtolAttitudeControl::task_main()
 			_vtol_vehicle_status.vtol_in_trans_mode = false;
 			_vtol_vehicle_status.in_transition_to_fw = false;
 
-			//_vtol_type->update_fw_state();
-			_vtol_type->update_transition_state();
+			_vtol_type->update_fw_state();
+			//_vtol_type->update_transition_state();
 
 		} else if (_vtol_type->get_mode() == TRANSITION_TO_MC || _vtol_type->get_mode() == TRANSITION_TO_FW) {
 

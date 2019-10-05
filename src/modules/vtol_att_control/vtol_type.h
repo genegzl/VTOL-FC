@@ -218,6 +218,7 @@ protected:
 	struct tecs_status_s				*_tecs_status;
 	struct vehicle_land_detected_s			*_land_detected;
 	struct sensor_accel_s               *_sensor_acc;
+	struct mission_result_s               *_mission_result;
 
 	struct Params 					*_params;
 

@@ -52,6 +52,8 @@
 #define M_PI (3.14159265f)
 #endif
 
+//#define SYSIDT
+
 #define RAD_TO_DEG(x) ((x) / 3.1416f * 180.0f)
 #define DEG_TO_RAD(x) ((x) / 180.0f * 3.1416f)
 
@@ -235,25 +237,6 @@ void Tailsitter::update_vtol_state()
 	}
 }
 
-float Tailsitter::get_CL(float aoa)
-{
-	float aoa_degree = RAD_TO_DEG(aoa);
-	int   aoa_int    = 0;
-	float CL         = 0.0f;
-
-	if ((fabsf(aoa_degree) <= 89.99f) && (fabsf(aoa_degree) >= 0.01f)) 
-	{
-		aoa_int = aoa_degree / 1;
-		CL      = _CL_Degree[aoa_int] + (aoa_degree - aoa_int) * (_CL_Degree[aoa_int + 1] - _CL_Degree[aoa_int]);
-	}
-	else
-	{
-		CL = 0.0f;
-	}
-
-	return CL;
-}
-
 /***
  *	calculate the thrust feedforward cmd based on the vertical acceleration cmd, horizontal velocity, pitch angle and ang-of-attack
  *	@input: vertical acceleration cmd (up is positive)
@@ -315,26 +298,11 @@ float Tailsitter::control_vertical_acc(float time_since_trans_start, float vert_
 		bx_acc_err_i      = 0.0f;
 	}
 
-	_vtol_vehicle_status->pitch_ang  = pitch;
 	_vtol_vehicle_status->bx_acc_cmd = bx_acc_cmd;
 	_vtol_vehicle_status->bx_acc_e   = bx_acc_err;
 	_vtol_vehicle_status->bx_acc_i   = bx_acc_err_i;
-	_vtol_vehicle_status->aoa        = AOA;
 
 	return thrust_cmd;
-}
-
-float ILC_in(float time_since_trans_start)
-{
-	if ((time_since_trans_start > 0.0001f) && (time_since_trans_start < 6.0f)) {
-		int   index_left = int(time_since_trans_start * 25);
-		float input      = U_ILC_INPUT[index_left] + (time_since_trans_start * 25.0f - index_left) * (U_ILC_INPUT[index_left + 1] - U_ILC_INPUT[index_left]);
-
-		return input;
-	}
-	else {
-		return 0.0f;
-	}
 }
 
 /* 
@@ -379,48 +347,12 @@ float Tailsitter::control_sideslip(float dt)
 {
 	if(_params->vt_sideslip_ctrl_en)
 	{
-		float roll_exceeding_treshold = 0.0f;
-		float min_roll_rad = DEG_TO_RAD(1.0f);
-
-		if (_trans_roll_rot > min_roll_rad)
-		{
-			roll_exceeding_treshold = _trans_roll_rot - min_roll_rad;
-
-		}
-		else if (_trans_roll_rot < - min_roll_rad)
-		{
-			roll_exceeding_treshold = _trans_roll_rot + min_roll_rad;
-		}
-
-		float horiz_vel = sqrtf((_local_pos->vx * _local_pos->vx) + (_local_pos->vy * _local_pos->vy));
-		float sideslip_gain = 0.0f;
-
-		switch (_vtol_sysidt.state)
-		{
-			case TRIM_FLIGHT :
-				sideslip_gain = 0.2f;
-				break;
-			case TURN_FLIGHT :
-				sideslip_gain = 9.8f / math::constrain(horiz_vel, 3.0f, 25.0f);
-				break;
-		}
-
-		float vx = _local_pos->vx;
-		float vy = _local_pos->vy;
-		float vel_ang = atan2f(vy, vx);
-		_vtol_vehicle_status->sideslip_ang = vel_ang - _yaw;
-
-		float yawrate_sp = math::constrain(roll_exceeding_treshold * sideslip_gain, - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
-		//yawrate_sp = 0.0f;
-		_yaw += dt * yawrate_sp;
 		if(_yaw >= DEG_TO_RAD(180.0f))
 		{
 			_yaw -= DEG_TO_RAD(360.f);
 		}
-
-		//return math::constrain(roll_exceeding_treshold * sideslip_gain, - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
 	}
-	return 0.0f;
+	return _yaw;
 }
 
 /***
@@ -485,13 +417,12 @@ float Tailsitter::calc_pitch_rot(float time_since_trans_start) {
 		if (time_since_trans_start <= POINT_ACTION[0][i+1]) {
 			angle = POINT_ACTION[1][i] + (time_since_trans_start - POINT_ACTION[0][i]) / (POINT_ACTION[0][i+1] - POINT_ACTION[0][i]) * (POINT_ACTION[1][i+1] - POINT_ACTION[1][i]);
 			angle = DEG_TO_RAD(math::constrain(angle, 0.0f, 90.0f));
-			break;	
+			break;
 		}
 		if (time_since_trans_start >= POINT_ACTION[0][POINT_NUM - 1]) {
 			angle = DEG_TO_RAD(POINT_ACTION[1][POINT_NUM - 1]);
 		}
 	}
-
 	return angle;
 }
 
@@ -584,76 +515,18 @@ float Tailsitter::get_theta_cmd(){
 	return (90.0f - theta); 
 }
 
-void Tailsitter::update_sysidt_state(){
-	float now = float(hrt_absolute_time()) * 1e-6f;
-	switch (_vtol_sysidt.state){
-
-	case SYSIDT_LOCK:
-		break;
-
-	case TRIM_FLIGHT:
-		/* Global counter */
-		if (now - _vtol_sysidt.trim_timer >= _params->sysidt_acctime)
-		{
-			_vtol_sysidt.state = TURN_FLIGHT;
-			_vtol_sysidt.trim_counter += 1;
-		}
-		break;
-
-	case TURN_FLIGHT:
-		if (is_ground_speed_satisfied())
-		{
-			_vtol_sysidt.state = TRIM_FLIGHT;
-			_vtol_sysidt.turn_counter += 1;
-			_vtol_sysidt.is_accelerated = false;
-			_trans_start_y = _local_pos->y;
-			_trans_start_x = _local_pos->x;
-			_vtol_sysidt.trim_timer = now;
-		}
-		break;
-	}
-	_vtol_vehicle_status->pitchrot 		= _trans_pitch_rot;
-	_vtol_vehicle_status->rollrot       = _trans_roll_rot;
-	_vtol_sysidt.global_counter = round(_vtol_sysidt.turn_counter / 2);
-	_vtol_vehicle_status->vehicle_sysidt_state = _vtol_sysidt.state;
-	_vtol_vehicle_status->global_counter = _vtol_sysidt.global_counter;
-
-	return;	
-}
-
-void Tailsitter::run_sysidt_state_machine(){
-	float now = float(hrt_absolute_time()) * 1e-6f;
-	switch (_vtol_sysidt.state){
-	case SYSIDT_LOCK:
-		break;
-	case TRIM_FLIGHT:
-		if (now - _vtol_sysidt.trim_timer <= _params->sysidt_acctime){
-			_trans_pitch_rot = calc_pitch_rot(now - _vtol_sysidt.trim_timer);
-		} else {
-			POINT_ACTION[1][0] = 82.0f;//get_theta_cmd();
-			_trans_pitch_rot = DEG_TO_RAD(POINT_ACTION[1][0]);
-		}
-		_trans_roll_rot = calc_roll_sp();
-		break;
-	case TURN_FLIGHT:
-		_trans_pitch_rot = DEG_TO_RAD(82.0f);//DEG_TO_RAD(get_theta_cmd());
-		_trans_roll_rot = DEG_TO_RAD(_params->sysidt_roll);		
-		//_q_trans_sp = Eulerf(_trans_roll_rot, -_trans_pitch_rot, _yaw);
-		break;
-	}
-	update_sysidt_state();
-	return;
-}
-
-void Tailsitter::update_axis_vector()
+float Tailsitter::cal_sysidt_pitch()
 {
-	//Vector3f x = Dcmf(Quatf(_v_att->q)) * Vector3f(1, 0, 0);
-	//Vector3f z = Dcmf(Quatf(_v_att->q)) * Vector3f(0, 0, -1);
-	_trans_pitch_axis = Vector3f(0, 1, 0);
-	_trans_roll_axis  = Vector3f(1, 0, 0);
+	float pitch_sp = DEG_TO_RAD(-POINT_ACTION[1][POINT_NUM - 1]);
+	if (_mission_result->seq_current > 0)
+	{
+		pitch_sp = - 1.0f * (_params->sysidt_minaoa - int((_mission_result->seq_current + 1.1f) * 0.5f) * _params->sysidt_interval);
+		pitch_sp = DEG_TO_RAD(math::constrain(pitch_sp, -90.0f, 0.0f));
+	}
 
-	//_yaw = Eulerf_zxy(Quatf(_v_att->q)).psi();
+	return pitch_sp;
 }
+
 
 void Tailsitter::update_transition_state()
 {
@@ -672,8 +545,6 @@ void Tailsitter::update_transition_state()
 	if (!_flag_was_in_trans_mode) 
 	{
 		_flag_was_in_trans_mode = true;
-
-		update_axis_vector();
 		PID_Initialize();
 		State_Machine_Initialize();
 		_alt_sp          = _local_pos->z;
@@ -695,51 +566,71 @@ void Tailsitter::update_transition_state()
 	/** Front Trans Control **/
 	switch (_vtol_schedule.flight_mode)
 	{
-		case FW_MODE:
 		case TRANSITION_FRONT_P1:
 		{
-			update_axis_vector();
-
-			run_sysidt_state_machine();
+			_trans_pitch_rot = -1.0f * calc_pitch_rot(time_since_trans_start);
 			/* lateral control */
-			//calc_q_trans_sp();
+			_trans_roll_rot  = calc_roll_sp();
 
 			/* sideslip control */
-			_v_att_sp->yaw_sp_move_rate = control_sideslip(dt);
+			_v_att_sp->yaw_sp_move_rate = 0.0f;
+			_yaw = control_sideslip(dt);
 
 			/* Altitude control */
 			_v_att_sp->thrust_body[2] = control_altitude(time_since_trans_start, _alt_sp, VERT_CONTROL_MODE);
 
 			/* save the thrust value at the end of the transition */
 			_trans_end_thrust = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
+			break;
+		}
+		case FW_MODE:
+		{
+			/* vertical control */
+			#ifdef SYSIDT
+			_trans_pitch_rot = cal_sysidt_pitch();
+			#else
+			_trans_pitch_rot = DEG_TO_RAD(-90.0f)-_fw_virtual_att_sp->pitch_body;
+			#endif
 
+			/* lateral control */
+			_trans_roll_rot = _fw_virtual_att_sp->roll_body;
+
+			/* sideslip control */
+			_v_att_sp->yaw_sp_move_rate = 0.0f;
+			_yaw = _fw_virtual_att_sp->yaw_body;//control_sideslip(dt);
+
+			/* Altitude control */
+			#ifdef SYSIDT
+			_v_att_sp->thrust_body[2] = control_altitude(time_since_trans_start, _alt_sp, VERT_CONTROL_MODE);
+			#endif
+			
 			break;
 		}
 		default:
 			break;
 	}
-	_q_trans_start = Eulerf(0.0f, 0.0f, _yaw);
-	_q_trans_sp = _q_trans_start * Quatf(AxisAnglef(_trans_roll_axis, _trans_roll_rot)) * Quatf(AxisAnglef(_trans_pitch_axis, -_trans_pitch_rot));
+
 	send_atti_sp();
 
 	static int ii = 0;
-	//ii ++;
+	ii ++;
 	if ((ii % 100) == 1)
 	{
-		mavlink_log_critical(&mavlink_log_pub, "calulated pitch sp: %.4f", double(-_trans_pitch_rot * 57.3f));
+		mavlink_log_critical(&mavlink_log_pub, "wp_item: %d calulated pitch sp: %.4f", _mission_result->seq_current, double(_trans_pitch_rot * 57.3f));
 	}
 
 }
 
 void Tailsitter::send_atti_sp()
 {
-	_v_att_sp->roll_body  = _fw_virtual_att_sp->roll_body;
-	_v_att_sp->pitch_body = -_trans_pitch_rot;
+	_v_att_sp->roll_body  = _trans_roll_rot;
+	_v_att_sp->pitch_body = _trans_pitch_rot;
 	_v_att_sp->yaw_body   = _yaw;
 
-	_q_trans_sp.copyTo(_v_att_sp->q_d);
-	_v_att_sp->q_d_valid = true;
+	_v_att_sp->q_d_valid = false;
 	_v_att_sp->timestamp = hrt_absolute_time();
+
+	_vtol_vehicle_status->pitch_sp = _trans_pitch_rot;
 }
 
 void Tailsitter::waiting_on_tecs()
@@ -838,7 +729,9 @@ void Tailsitter::fill_actuator_outputs()
 		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
 
-		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL]  = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];	// roll elevon
-		//_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH] + _params->fw_pitch_trim;	// pitch elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] =
+			-_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] =
+			_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];	// pitch elevon
 	}
 }

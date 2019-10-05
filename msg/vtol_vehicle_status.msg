@@ -11,8 +11,7 @@ uint64 timestamp			# time since system start (microseconds)
 uint64 vehicle_sysidt_state             # State machine record for system identification experiment
 
 uint64  ticks_since_trans               # for ILC debug
-float32 ilc_input                      # feed-forward command of thrust
-float32 aoa
+float32 pitch_sp
 float32 pitch_ang
 float32 vert_acc_cmd
 float32 thrust_cmd

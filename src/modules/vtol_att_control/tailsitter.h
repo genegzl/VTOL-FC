@@ -70,16 +70,13 @@ public:
 	virtual void PID_Initialize();
 	virtual void State_Machine_Initialize();
 
-	void run_sysidt_state_machine();
-	void update_sysidt_state();
-	void update_axis_vector();
+	float cal_sysidt_pitch();
 
 	//virtual float control_vertical_speed(float vz, float vz_cmd);
 	virtual float control_sideslip(float dt);
 	virtual float calc_vz_cmd(float time_since_trans_start);
 	virtual float control_altitude(float time_since_trans_start, float alt_cmd, int control_loop_mode);
 	virtual float control_vertical_acc(float time_since_trans_start, float vert_acc_cmd, float vert_vel_cmd);
-	virtual float get_CL(float aoa);
 	virtual float calc_pitch_rot(float time_since_trans_start);
 	virtual float get_theta_cmd();
 	bool is_ground_speed_satisfied();
