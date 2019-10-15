@@ -52,7 +52,7 @@
 #define M_PI (3.14159265f)
 #endif
 
-#define SYSIDT
+//#define SYSIDT
 
 #define RAD_TO_DEG(x) ((x) / 3.1416f * 180.0f)
 #define DEG_TO_RAD(x) ((x) / 180.0f * 3.1416f)
@@ -589,14 +589,14 @@ void Tailsitter::update_transition_state()
 			#ifdef SYSIDT
 			_trans_pitch_rot = cal_sysidt_pitch();
 			#else
-			_trans_pitch_rot = _fw_virtual_att_sp->pitch_body;
+			_trans_pitch_rot = DEG_TO_RAD(-90.0f)+_fw_virtual_att_sp->pitch_body;
 			#endif
 
 			/* lateral control */
 			_trans_roll_rot = _fw_virtual_att_sp->roll_body;
 
 			/* sideslip control */
-			_v_att_sp->yaw_sp_move_rate = 0.0f;
+			//_v_att_sp->yaw_sp_move_rate = 0.0f;
 			_yaw = _fw_virtual_att_sp->yaw_body;//control_sideslip(dt);
 
 			/* Altitude control */
@@ -614,7 +614,7 @@ void Tailsitter::update_transition_state()
 
 	static int ii = 0;
 	ii ++;
-	if (ii % 250 == 1)
+	if (ii % 100 == 1)
 	{
 		mavlink_log_critical(&mavlink_log_pub, "wp_item: %d calulated pitch sp: %.4f %.4f", _mission_result->seq_current, double(_trans_pitch_rot * 57.3f), double(_fw_virtual_att_sp->pitch_body * 57.3f));
 	}
@@ -713,6 +713,19 @@ void Tailsitter::fill_actuator_outputs()
 		break;
 
 	case FIXED_WING:
+		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL];
+		_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH];
+		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
+		#ifdef SYSIDT
+		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
+		#else
+		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE];
+		#endif
+
+		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = -_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];	// pitch elevon
+
+
 	case TRANSITION_TO_FW:
 	case TRANSITION_TO_MC:
 		/**
@@ -726,7 +739,7 @@ void Tailsitter::fill_actuator_outputs()
 
 		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL];
 		_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH];
-		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = 0.0f;//_actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
+		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
 
 		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
