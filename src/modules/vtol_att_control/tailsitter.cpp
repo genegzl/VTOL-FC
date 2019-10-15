@@ -520,7 +520,7 @@ float Tailsitter::cal_sysidt_pitch()
 	float pitch_sp = DEG_TO_RAD(-POINT_ACTION[1][POINT_NUM - 1]);
 	if (_mission_result->seq_current > 0)
 	{
-		pitch_sp = - 90.0f + (_params->sysidt_minaoa + int((_mission_result->seq_current + 1.1f) * 0.5f) * _params->sysidt_interval);
+		pitch_sp = - 90.0f + (_params->sysidt_minaoa + (_mission_result->instance_count - 1) * _params->sysidt_interval);
 		pitch_sp = DEG_TO_RAD(math::constrain(pitch_sp, -90.0f, 0.0f));
 	}
 
@@ -726,10 +726,10 @@ void Tailsitter::fill_actuator_outputs()
 
 		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL];
 		_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH];
-		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
+		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = 0.0f;//_actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
 
 		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
-		//_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = -_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];	// pitch elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = -_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];	// pitch elevon
 	}
 }
