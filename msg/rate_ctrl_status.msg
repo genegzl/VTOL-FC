@@ -22,3 +22,5 @@ float32 rollspeed_integ
 float32 pitchspeed_integ
 float32 yawspeed_integ
 float32 additional_integ1	# FW: wheel rate integrator (optional)
+
+float32 sideslip_ang

@@ -60,8 +60,10 @@
 #define AXIS_INDEX_YAW 2
 #define AXIS_COUNT 3
 
-#define RAD_TO_DEG(x) ((x) / 3.1416f * 180.0f)
-#define DEG_TO_RAD(x) ((x) / 180.0f * 3.1416f)
+#define RAD_TO_DEG(x) ((x) / 3.1415926f * 180.0f)
+#define DEG_TO_RAD(x) ((x) / 180.0f * 3.1415926f)
+#define CORRECT_ANG(x) (((x)>DEG_TO_RAD(359.9f))? (x)-DEG_TO_RAD(360.0f) : (((x)<DEG_TO_RAD(-359.9f))? (x)+DEG_TO_RAD(360.0f) : (x)))
+#define CORRECT_YAW(x) (((x)>DEG_TO_RAD(175.0f))? (x)-DEG_TO_RAD(180.0f) : (((x)<DEG_TO_RAD(-175.0f))? (x)+DEG_TO_RAD(180.0f) : (x)))
 
 using namespace matrix;
 
@@ -608,7 +610,7 @@ MulticopterAttitudeControl::control_attitude()
 	Vector3f eq = 2.f * math::signNoZero(qe(0)) * qe.imag();
 
 	/* calculate angular rates setpoint */
-	if (_vehicle_status.in_transition_to_fw || !_vehicle_status.is_rotary_wing)
+	if (_vehicle_status.in_transition_mode || !_vehicle_status.is_rotary_wing)
 	{
 		Eulerf_zxy q_zxy(Quatf(_v_att.q));
 		Eulerf_zxy qd_zxy(Quatf(_v_att_sp.q_d));
@@ -617,20 +619,35 @@ MulticopterAttitudeControl::control_attitude()
 		Vector3f euler_sp(_v_att_sp.roll_body, _v_att_sp.pitch_body, _v_att_sp.yaw_body);
 
 		eq = euler_sp - euler_fdb;
+		CORRECT_ANG(eq(0));
+		CORRECT_ANG(eq(1));
+		CORRECT_ANG(eq(2));
 
 		Vector3f euler_rate_sp = eq.emult(attitude_gain);
 
 		/** yaw **/
-		float horiz_vel = sqrtf((_local_pos.vx * _local_pos.vx) + (_local_pos.vy * _local_pos.vy));
-		float yawrate_sp = q_zxy.phi() * CONSTANTS_ONE_G / math::constrain(horiz_vel, 3.0f, 25.0f);
+		float yawrate_sp = 0.0f;
+		float horiz_vel  = sqrtf((_local_pos.vx * _local_pos.vx) + (_local_pos.vy * _local_pos.vy));
 
-		float rollrate_sp  = math::constrain(euler_rate_sp(0), - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
-		float pitchrate_sp = math::constrain(euler_rate_sp(1), - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
-		yawrate_sp         = math::constrain(yawrate_sp, - DEG_TO_RAD(90.0f), DEG_TO_RAD(90.0f));
+		if (_v_att_sp.sideslip_ctrl_en)
+		{
+			yawrate_sp =  q_zxy.phi() * 9.8f / math::constrain(horiz_vel, 3.0f, 25.0f);
+		}
+		else
+		{
+			yawrate_sp = 0.0f;//euler_rate_sp(2);
+		}
+
+		float rollrate_sp  = euler_rate_sp(0);
+		float pitchrate_sp = euler_rate_sp(1);
+		yawrate_sp         = yawrate_sp;
+		float sideslip_ang = horiz_vel > 3.0f ? atan2f(_local_pos.vy, _local_pos.vx) - euler_fdb(2) : 0.0f;
+		sideslip_ang       = CORRECT_YAW(sideslip_ang);
 
 		_rate_ctrl_status.rollspeed_i_sp = rollrate_sp;
 		_rate_ctrl_status.pitchspeed_i_sp = pitchrate_sp;
 		_rate_ctrl_status.yawspeed_i_sp = yawrate_sp;
+		_rate_ctrl_status.sideslip_ang = sideslip_ang;
 
 		_rates_sp(0) = rollrate_sp * cosf(q_zxy.theta()) - yawrate_sp * cosf(q_zxy.phi()) * sinf(q_zxy.theta());
 		_rates_sp(1) = pitchrate_sp + yawrate_sp * sinf(q_zxy.phi());
@@ -702,7 +719,7 @@ void
 MulticopterAttitudeControl::control_attitude_rates(float dt)
 {
 	/* reset integral if disarmed */
-	if (!_v_control_mode.flag_armed || !_vehicle_status.is_rotary_wing) {
+	if (!_v_control_mode.flag_armed || !_params.mc_integ_in_fw_en) {
 		_rates_int.zero();
 	}
 

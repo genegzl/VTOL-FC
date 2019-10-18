@@ -636,6 +636,8 @@ void Logger::add_default_topics()
 	add_topic("manual_control_setpoint", 200);
 	add_topic("mission",0);
 	add_topic("mission_result",0);
+	add_topic("fw_virtual_attitude_setpoint",0);
+	add_topic("mc_virtual_attitude_setpoint",0);
 	//add_topic("optical_flow", 50);
 	add_topic("position_setpoint_triplet", 200);
 	add_topic("vehicle_control_mode", 0);
@@ -667,8 +669,6 @@ void Logger::add_default_topics()
 #ifdef CONFIG_ARCH_BOARD_PX4_SITL
 	add_topic("actuator_controls_virtual_fw");
 	add_topic("actuator_controls_virtual_mc");
-	add_topic("fw_virtual_attitude_setpoint");
-	add_topic("mc_virtual_attitude_setpoint");
 	add_topic("multirotor_motor_limits");
 	add_topic("position_controller_status");
 	add_topic("offboard_control_mode");

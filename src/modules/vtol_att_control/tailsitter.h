@@ -45,6 +45,7 @@
 #include "vtol_type.h"
 #include "ILC_DATA.h"
 #include "euler_zxy.h"
+#include "Quaternion_zxy.hpp"
 #include <perf/perf_counter.h>  /** is it necsacery? **/
 #include <parameters/param.h>
 #include <drivers/drv_hrt.h>
@@ -74,11 +75,14 @@ public:
 
 	//virtual float control_vertical_speed(float vz, float vz_cmd);
 	virtual float control_sideslip(float dt);
+	virtual void  reset_trans_start_state();
 	virtual float calc_vz_cmd(float time_since_trans_start);
 	virtual float control_altitude(float time_since_trans_start, float alt_cmd, int control_loop_mode);
 	virtual float control_vertical_acc(float time_since_trans_start, float vert_acc_cmd, float vert_vel_cmd);
 	virtual float calc_pitch_rot(float time_since_trans_start);
 	virtual float get_theta_cmd();
+	virtual float calc_pitch_b_trans(float dt);
+	virtual float calc_roll_b_trans(float dt);
 	bool is_ground_speed_satisfied();
 
 private:
@@ -133,8 +137,7 @@ private:
 		float       ctrl_out_trans_end; /**< MC controller output at the end of front transition */
 		hrt_abstime fw_start;           /**< absoulte time at which fw mode started, this time will be used to smooth the controller output */
 		hrt_abstime sweep_start;
-		hrt_abstime f_trans_start_t;	/**< absoulte time at which front transition started */
-		hrt_abstime b_trans_start_t;
+		hrt_abstime _trans_start_t;	/**< absoulte time at which front transition started */
 		bool 	    vz_mission_finished = false;
 	} _vtol_schedule;
 
@@ -163,7 +166,7 @@ private:
 
 	float POINT_ACTION[2][POINT_NUM] = {
 	{0.0f, 2.5f, 3.0f, 3.5f},
-	{0.0f, 82.0f, 82.0f, 82.0f}
+	{0.0f, -88.0f, -88.0f, -88.0f}
 	};
 
 	float _alt_sp;
@@ -176,6 +179,8 @@ private:
 	float _trans_start_x;
 	float _trans_start_y;
 	float _trans_start_yaw;
+	float _trans_start_pitch;
+	float _trans_start_roll;
 	float _CL_Degree[NUM_CL_POINTS+1];
 	float _target_alt;
 	float _yaw;

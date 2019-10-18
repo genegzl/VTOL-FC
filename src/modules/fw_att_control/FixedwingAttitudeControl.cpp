@@ -453,7 +453,7 @@ FixedwingAttitudeControl::vehicle_status_poll()
 		// by the multicoper attitude controller. Therefore, modify the control mode to achieve rate
 		// control only
 		if (_vehicle_status.is_vtol) {
-			if (_vehicle_status.is_rotary_wing && !_vehicle_status.in_transition_to_fw) {
+			if (_vehicle_status.is_rotary_wing && !_vehicle_status.in_transition_mode) {
 				_vcontrol_mode.flag_control_attitude_enabled = false;
 				_vcontrol_mode.flag_control_manual_enabled = false;
 			}

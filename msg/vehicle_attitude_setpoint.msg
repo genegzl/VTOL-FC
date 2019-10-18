@@ -4,6 +4,7 @@ float32 roll_body		# body angle in NED frame (can be NaN for FW)
 float32 pitch_body		# body angle in NED frame (can be NaN for FW)
 float32 yaw_body		# body angle in NED frame (can be NaN for FW)
 
+bool sideslip_ctrl_en
 float32 yaw_sp_move_rate	# rad/s (commanded by user)
 
 # For quaternion-based attitude control

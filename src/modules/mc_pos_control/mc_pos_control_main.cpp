@@ -793,7 +793,7 @@ MulticopterPositionControl::run()
 			_att_sp.fw_control_yaw = false;
 			_att_sp.apply_flaps = false;
 
-			if(_vehicle_status.in_transition_to_fw)
+			if(_vehicle_status.in_transition_mode)
 			{
 				_att_sp.yaw_body = _states.yaw;
 			}

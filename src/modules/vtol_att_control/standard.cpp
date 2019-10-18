@@ -162,7 +162,6 @@ void Standard::update_vtol_state()
 			    (_local_pos->v_xy_valid && x_vel <= _params->mpc_xy_cruise)) {
 				_vtol_schedule.flight_mode = MC_MODE;
 			}
-
 		}
 
 	} else {
