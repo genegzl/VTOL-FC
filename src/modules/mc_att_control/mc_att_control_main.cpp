@@ -719,7 +719,7 @@ void
 MulticopterAttitudeControl::control_attitude_rates(float dt)
 {
 	/* reset integral if disarmed */
-	if (!_v_control_mode.flag_armed || !_params.mc_integ_in_fw_en) {
+	if (!_v_control_mode.flag_armed){// || !_params.mc_integ_in_fw_en) {
 		_rates_int.zero();
 	}
 
