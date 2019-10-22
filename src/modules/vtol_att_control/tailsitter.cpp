@@ -239,12 +239,14 @@ void Tailsitter::update_vtol_state()
 	// map tailsitter specific control phases to simple control modes
 	switch (_vtol_schedule.flight_mode) {
 	case MC_MODE:
+		reset_trans_start_state();
 		_vtol_mode = ROTARY_WING;
 		_vtol_vehicle_status->vtol_in_trans_mode = false;
 		_flag_was_in_trans_mode = false;
 		break;
 
 	case FW_MODE:
+		reset_trans_start_state();
 		_vtol_mode = FIXED_WING;
 		_vtol_vehicle_status->vtol_in_trans_mode = false;
 		break;
