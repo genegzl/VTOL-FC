@@ -635,7 +635,7 @@ MulticopterAttitudeControl::control_attitude()
 		}
 		else
 		{
-			yawrate_sp = euler_rate_sp(2);
+			yawrate_sp = 0.0f;
 		}
 
 		float rollrate_sp  = euler_rate_sp(0);
