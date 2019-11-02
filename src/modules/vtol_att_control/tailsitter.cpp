@@ -695,6 +695,7 @@ void Tailsitter::update_transition_state()
 			#else
 			_alt_sp = _local_pos->z;
 			_v_att_sp->thrust_body[2] = -_fw_virtual_att_sp->thrust_body[0];
+			PID_Initialize();
 			#endif
 			
 			break;
@@ -821,8 +822,8 @@ void Tailsitter::fill_actuator_outputs()
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE];
 		#endif
 
-		//_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
-		//_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = -_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];	// pitch elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = -_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];	// pitch elevon
 
 
 	case TRANSITION_TO_FW:
@@ -841,7 +842,7 @@ void Tailsitter::fill_actuator_outputs()
 		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
 
-		//_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
-		//_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = -_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];	// pitch elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
+		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = -_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];	// pitch elevon
 	}
 }
