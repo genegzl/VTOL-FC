@@ -638,6 +638,8 @@ void Logger::add_default_topics()
 	add_topic("mission_result",0);
 	add_topic("fw_virtual_attitude_setpoint",0);
 	add_topic("mc_virtual_attitude_setpoint",0);
+	add_topic("actuator_controls_virtual_fw",0);
+	add_topic("actuator_controls_virtual_mc",0);
 	//add_topic("optical_flow", 50);
 	add_topic("position_setpoint_triplet", 200);
 	add_topic("vehicle_control_mode", 0);

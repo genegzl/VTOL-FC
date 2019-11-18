@@ -180,14 +180,14 @@ void Tailsitter::update_vtol_state()
 
 		case FW_MODE:
 			
-			if ((fabsf(pitch) >= DEG_TO_RAD(100.0f)) || (fabsf(roll) >= DEG_TO_RAD(65.0f)) || (att_danger_lock == true))
+			if ((fabsf(pitch) >= DEG_TO_RAD(115.0f)) || (fabsf(roll) >= DEG_TO_RAD(85.0f)) || (att_danger_lock == true))
 			{
 				att_danger_lock             = true;
 				mavlink_log_critical(&mavlink_log_pub, "dangerous attitude");
 				_vtol_schedule.flight_mode = TRANSITION_BACK;
 			}
 
-			if ((_local_pos->z > (- _params->vt_safe_alt)) || (_local_pos->vz > 6.0f) || (alt_danger_lock == true))
+			if ((_local_pos->z > (- _params->vt_safe_alt)) || (_local_pos->vz > 10.0f) || (alt_danger_lock == true))
 			{
 				alt_danger_lock             = true;
 				mavlink_log_critical(&mavlink_log_pub, "dangerous altitude");
@@ -221,14 +221,14 @@ void Tailsitter::update_vtol_state()
 	/* Safety altitude protection, stay at MC mode when trige for once */
 	if (!(_vtol_schedule.flight_mode == MC_MODE))
 	{
-		if ((fabsf(pitch) >= DEG_TO_RAD(110.0f)) || (fabsf(roll) >= DEG_TO_RAD(70.0f)) || (att_danger_lock == true))
+		if ((fabsf(pitch) >= DEG_TO_RAD(115.0f)) || (fabsf(roll) >= DEG_TO_RAD(85.0f)) || (att_danger_lock == true))
 		{
 			att_danger_lock             = true;
 			mavlink_log_critical(&mavlink_log_pub, "dangerous attitude");
 			_vtol_schedule.flight_mode = MC_MODE;
 		}
 
-		if ((_local_pos->z > (- _params->vt_safe_alt)) || (_local_pos->vz > 6.0f) || (alt_danger_lock == true))
+		if ((_local_pos->z > (- _params->vt_safe_alt)) || (_local_pos->vz > 10.0f) || (alt_danger_lock == true))
 		{
 			alt_danger_lock             = true;
 			mavlink_log_critical(&mavlink_log_pub, "dangerous altitude");
@@ -669,7 +669,7 @@ void Tailsitter::update_transition_state()
 
 			_v_att_sp->sideslip_ctrl_en = false;
 
-			_v_att_sp->thrust_body[2] = math::constrain(control_altitude(time_since_trans_start, _alt_sp, VERT_CONTROL_MODE), -0.7f, -0.2f);
+			_v_att_sp->thrust_body[2] = math::constrain(control_altitude(time_since_trans_start, _alt_sp, VERT_CONTROL_MODE), -0.7f, -0.30f);
 			break;
 		}
 
@@ -705,14 +705,14 @@ void Tailsitter::update_transition_state()
 	}
 
 	send_atti_sp();
-
+/***
 	static int ii = 0;
 	ii ++;
 	if (ii % 25 == 1)
 	{
 		mavlink_log_critical(&mavlink_log_pub, "wp_item: %d calulated pitch sp: %.4f %.4f", _mission_result->seq_current, double(RAD_TO_DEG(_trans_pitch_rot)), double(RAD_TO_DEG(_fw_virtual_att_sp->pitch_body)));
 	}
-
+***/
 }
 
 void Tailsitter::send_atti_sp()
@@ -813,13 +813,13 @@ void Tailsitter::fill_actuator_outputs()
 		break;
 
 	case FIXED_WING:
-		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = 0.0f;//_actuators_mc_in->control[actuator_controls_s::INDEX_ROLL];
+		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL];
 		_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH];
 		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
 		#ifdef SYSIDT
 		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
 		#else
-		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE];
+		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _fw_virtual_att_sp->thrust_body[0];//_actuators_fw_in->control[actuator_controls_s::INDEX_THROTTLE];
 		#endif
 
 		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
@@ -840,7 +840,7 @@ void Tailsitter::fill_actuator_outputs()
 		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL];
 		_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH];
 		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
-		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
+		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = math::constrain(_actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE], 0.3f, 0.75f);
 
 		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
 		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = -_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];	// pitch elevon
