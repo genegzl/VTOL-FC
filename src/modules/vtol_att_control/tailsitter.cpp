@@ -67,12 +67,17 @@
 #define	Min_Thrust_cmd 0.1f
 #define VERT_CONTROL_MODE  (CONTROL_POS) // modes: CONTROL_POS, CONTROL_VEL, CONTROL_VEL_WITHOUT_ACC
 
+#define CTRL_FREQ (250.0f)
+
 static  orb_advert_t mavlink_log_pub = nullptr;
 
 using namespace matrix;
 
 Tailsitter::Tailsitter(VtolAttitudeControl *attc) :
-	VtolType(attc)
+	VtolType(attc),
+	_accel_filter_x(CTRL_FREQ, 15.0f),
+	_accel_filter_y(CTRL_FREQ, 15.0f),
+	_accel_filter_z(CTRL_FREQ, 15.0f)
 {
 	_vtol_schedule.flight_mode = MC_MODE;
 	_vtol_schedule._trans_start_t = 0.0f;
@@ -135,10 +140,7 @@ void Tailsitter::update_vtol_state()
 	float pitch = q_zxy.theta();
 	float roll = q_zxy.phi();
 
-	static bool att_danger_lock = false;
-	static bool alt_danger_lock = false;
-
-	if ((!_attc->is_fixed_wing_requested()) || att_danger_lock || alt_danger_lock) {
+	if (!_attc->is_fixed_wing_requested()) {
 
 		switch (_vtol_schedule.flight_mode) { // user switchig to MC mode
 		case MC_MODE:
@@ -180,17 +182,15 @@ void Tailsitter::update_vtol_state()
 
 		case FW_MODE:
 			
-			if ((fabsf(pitch) >= DEG_TO_RAD(115.0f)) || (fabsf(roll) >= DEG_TO_RAD(85.0f)) || (att_danger_lock == true))
+			if ((fabsf(pitch) >= DEG_TO_RAD(115.0f)) || (fabsf(roll) >= DEG_TO_RAD(85.0f)))
 			{
-				att_danger_lock             = true;
-				mavlink_log_critical(&mavlink_log_pub, "dangerous attitude");
+				_attc->abort_front_transition("dangerous attitude");
 				_vtol_schedule.flight_mode = TRANSITION_BACK;
 			}
 
-			if ((_local_pos->z > (- _params->vt_safe_alt)) || (_local_pos->vz > 10.0f) || (alt_danger_lock == true))
+			if ((_local_pos->z > (- _params->vt_safe_alt)) || (_local_pos->vz > 10.0f))
 			{
-				alt_danger_lock             = true;
-				mavlink_log_critical(&mavlink_log_pub, "dangerous altitude");
+				_attc->abort_front_transition("dangerous height");
 				_vtol_schedule.flight_mode = MC_MODE;
 			}
 			break;
@@ -207,6 +207,9 @@ void Tailsitter::update_vtol_state()
 					_vtol_schedule.flight_mode = FW_MODE;
 					//_vtol_schedule.flight_mode = MC_MODE;
 				}
+				else if (time_since_trans_start >= _params->front_trans_duration + 2.0f){
+					_attc->abort_front_transition("Transition timeout");
+				}
 
 				break;
 			}
@@ -218,23 +221,6 @@ void Tailsitter::update_vtol_state()
 		}
 	}
 	
-	/* Safety altitude protection, stay at MC mode when trige for once */
-	if (!(_vtol_schedule.flight_mode == MC_MODE))
-	{
-		if ((fabsf(pitch) >= DEG_TO_RAD(115.0f)) || (fabsf(roll) >= DEG_TO_RAD(85.0f)) || (att_danger_lock == true))
-		{
-			att_danger_lock             = true;
-			mavlink_log_critical(&mavlink_log_pub, "dangerous attitude");
-			_vtol_schedule.flight_mode = MC_MODE;
-		}
-
-		if ((_local_pos->z > (- _params->vt_safe_alt)) || (_local_pos->vz > 10.0f) || (alt_danger_lock == true))
-		{
-			alt_danger_lock             = true;
-			mavlink_log_critical(&mavlink_log_pub, "dangerous altitude");
-			_vtol_schedule.flight_mode = MC_MODE;
-		}
-	}
 	
 	// map tailsitter specific control phases to simple control modes
 	switch (_vtol_schedule.flight_mode) {
@@ -459,6 +445,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 	_vtol_vehicle_status->ticks_since_trans ++;
 
 	/* send back command and feedback data */
+	mavlink_log_critical(&mavlink_log_pub, "thr_cmd:%.5f", (double)(thrust_cmd));
 
 	return (-1.0f * thrust_cmd);
 }

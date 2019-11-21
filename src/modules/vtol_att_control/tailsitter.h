@@ -51,6 +51,7 @@
 #include <drivers/drv_hrt.h>
 #include <matrix/matrix/math.hpp>
 #include <mathlib/math/EulerFromQuat.hpp>
+#include <mathlib/math/filter/LowPassFilter2p.hpp>
 #include <uORB/topics/vehicle_local_position.h>
 
 class Tailsitter : public VtolType
@@ -163,6 +164,9 @@ private:
 	matrix::Vector3f _trans_pitch_axis;
 	matrix::Vector3f _trans_roll_axis;
 	matrix::Vector3f _trans_yaw_axis;
+	math::LowPassFilter2p	_accel_filter_x;
+	math::LowPassFilter2p	_accel_filter_y;
+	math::LowPassFilter2p	_accel_filter_z;
 
 	float POINT_ACTION[2][POINT_NUM] = {
 	{0.0f, 2.5f, 3.0f, 3.5f},
