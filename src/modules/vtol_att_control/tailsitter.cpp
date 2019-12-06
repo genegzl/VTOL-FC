@@ -618,6 +618,7 @@ void Tailsitter::update_transition_state()
 		reset_trans_start_state();
 		_vert_i_term = 0.0f;
 		POINT_ACTION[1][0] = RAD_TO_DEG(_trans_start_pitch);
+		POINT_ACTION[0][1] = math::max(1.0f, _params->front_trans_duration-1.0f);
 	}
 
 	float time_since_trans_start = (float)(hrt_absolute_time() - _vtol_schedule._trans_start_t) * 1e-6f;
