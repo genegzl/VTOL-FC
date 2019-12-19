@@ -104,6 +104,7 @@ VtolAttitudeControl::VtolAttitudeControl()
 	_params_handles.vt_vy_kp = param_find("VT_VY_KP");
 	_params_handles.vt_vy_ki = param_find("VT_VY_KI");
 	_params_handles.vt_x_dist_kp = param_find("VT_X_DIST_KP");
+	_params_handles.vt_z_dist_kp = param_find("VT_Z_DIST_KP");
 	_params_handles.vt_vx_kp = param_find("VT_VX_KP");
 	_params_handles.vt_vx_ki = param_find("VT_VX_KI");
 	_params_handles.vt_max_height = param_find("VT_MAX_HEIGHT");
@@ -563,6 +564,8 @@ VtolAttitudeControl::parameters_update()
 	param_get(_params_handles.vt_vy_ki, &_params.vt_vy_ki);
 
 	param_get(_params_handles.vt_x_dist_kp, &_params.vt_x_dist_kp);
+
+	param_get(_params_handles.vt_z_dist_kp, &_params.vt_z_dist_kp);
 
 	param_get(_params_handles.vt_vx_kp, &_params.vt_vx_kp);
 

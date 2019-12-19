@@ -205,6 +205,14 @@ PARAM_DEFINE_FLOAT(VT_VY_KI, 0.01f);
 
 PARAM_DEFINE_FLOAT(VT_X_DIST_KP, 0.1f);
 
+
+/*
+* The parameters of the vertical dist controller
+* Kp 
+*/
+
+PARAM_DEFINE_FLOAT(VT_Z_DIST_KP, 0.5f);
+
 /*
 * The parameters of the longitudinal velocity controller
 * Kp

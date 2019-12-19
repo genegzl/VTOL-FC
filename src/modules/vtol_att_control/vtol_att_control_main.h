@@ -223,6 +223,7 @@ private:
 		param_t vt_vy_kp;
 		param_t vt_vy_ki;
 		param_t vt_x_dist_kp;
+		param_t vt_z_dist_kp;
 		param_t vt_vx_kp;
 		param_t vt_vx_ki;
 		param_t vt_max_height;

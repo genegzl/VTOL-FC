@@ -263,6 +263,7 @@ void Tailsitter::reset_trans_start_state()
 	_trans_start_yaw = Eulerf_zxy(Quatf(_v_att->q)).psi();
 	_trans_start_pitch = Eulerf_zxy(Quatf(_v_att->q)).theta();
 	_trans_start_roll = Eulerf_zxy(Quatf(_v_att->q)).phi();
+	PID_Initialize();
 
 	_trans_roll_rot  = _trans_start_roll;
 	_trans_pitch_rot = _trans_start_pitch;
@@ -404,7 +405,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 	
 	
 	/* position loop */
-	float alt_kp = _params->vt_x_dist_kp;
+	float alt_kp = _params->vt_z_dist_kp;
 	float vz_cmd = (control_loop_mode == CONTROL_POS) ? ((alt_cmd - _local_pos->z) * alt_kp) : calc_vz_cmd(time_since_trans_start);
 
 	/* velocity loop  */
@@ -430,7 +431,7 @@ float Tailsitter::control_altitude(float time_since_trans_start, float alt_cmd, 
 	float thrust_cmd = 0.0f;
 	if ((control_loop_mode == CONTROL_VEL_WITHOUT_ACC) || (control_loop_mode == CONTROL_POS))
 	{
-		thrust_cmd = math::constrain(vert_acc_cmd / 9.8f+ (- _mc_hover_thrust), 0.10f,0.95f);
+		thrust_cmd = math::constrain(vert_acc_cmd / 9.8f+ (- _mc_hover_thrust), 0.2f,0.85f);
 	}
 	else
 	{
@@ -613,7 +614,7 @@ void Tailsitter::update_transition_state()
 	if (!_flag_was_in_trans_mode) 
 	{
 		_flag_was_in_trans_mode = true;
-		PID_Initialize();
+		
 		State_Machine_Initialize();
 		reset_trans_start_state();
 		_vert_i_term = 0.0f;
@@ -657,7 +658,7 @@ void Tailsitter::update_transition_state()
 
 			_v_att_sp->sideslip_ctrl_en = false;
 
-			_v_att_sp->thrust_body[2] = math::constrain(control_altitude(time_since_trans_start, _alt_sp, VERT_CONTROL_MODE), -0.7f, -0.30f);
+			_v_att_sp->thrust_body[2] = control_altitude(time_since_trans_start, _alt_sp, VERT_CONTROL_MODE);
 			break;
 		}
 
@@ -828,7 +829,7 @@ void Tailsitter::fill_actuator_outputs()
 		_actuators_out_0->control[actuator_controls_s::INDEX_ROLL] = _actuators_mc_in->control[actuator_controls_s::INDEX_ROLL];
 		_actuators_out_0->control[actuator_controls_s::INDEX_PITCH] = _actuators_mc_in->control[actuator_controls_s::INDEX_PITCH];
 		_actuators_out_0->control[actuator_controls_s::INDEX_YAW] = _actuators_mc_in->control[actuator_controls_s::INDEX_YAW];
-		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = math::constrain(_actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE], 0.3f, 0.75f);
+		_actuators_out_0->control[actuator_controls_s::INDEX_THROTTLE] = _actuators_mc_in->control[actuator_controls_s::INDEX_THROTTLE];
 
 		_actuators_out_1->control[actuator_controls_s::INDEX_ROLL] = -_actuators_fw_in->control[actuator_controls_s::INDEX_ROLL];	// roll elevon
 		_actuators_out_1->control[actuator_controls_s::INDEX_PITCH] = -_actuators_fw_in->control[actuator_controls_s::INDEX_PITCH];	// pitch elevon

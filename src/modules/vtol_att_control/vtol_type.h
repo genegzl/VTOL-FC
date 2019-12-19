@@ -87,6 +87,7 @@ struct Params {
 	float vt_vy_kp;
 	float vt_vy_ki;
 	float vt_x_dist_kp;
+	float vt_z_dist_kp;
 	float vt_vx_kp;
 	float vt_vx_ki;
 	float vt_max_height;
