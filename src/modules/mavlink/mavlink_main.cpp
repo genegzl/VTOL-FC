@@ -1849,12 +1849,12 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 
 	case MAVLINK_MODE_CONFIG:
 		// Enable a number of interesting streams we want via USB
-		configure_stream_local("ACTUATOR_CONTROL_TARGET0", 30.0f);
+		configure_stream_local("ACTUATOR_CONTROL_TARGET0", unlimited_rate);
 		configure_stream_local("ADSB_VEHICLE", unlimited_rate);
 		configure_stream_local("ALTITUDE", 10.0f);
 		configure_stream_local("ATTITUDE", 50.0f);
 		configure_stream_local("ATTITUDE_TARGET", 8.0f);
-		configure_stream_local("ATTITUDE_QUATERNION", 100.0f);
+		configure_stream_local("ATTITUDE_QUATERNION", unlimited_rate);
 		configure_stream_local("CAMERA_TRIGGER", unlimited_rate);
 		configure_stream_local("CAMERA_IMAGE_CAPTURED", unlimited_rate);
 		configure_stream_local("COLLISION", unlimited_rate);
@@ -1867,9 +1867,9 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("ESTIMATOR_STATUS", 5.0f);
 		configure_stream_local("EXTENDED_SYS_STATE", 2.0f);
 		configure_stream_local("GLOBAL_POSITION_INT", 10.0f);
-		configure_stream_local("HIGHRES_IMU", 100.0f);
+		configure_stream_local("HIGHRES_IMU", 1.0f);
 		configure_stream_local("HOME_POSITION", 0.5f);
-		configure_stream_local("LOCAL_POSITION_NED", 30.0f);
+		configure_stream_local("LOCAL_POSITION_NED", unlimited_rate);
 		configure_stream_local("MANUAL_CONTROL", 5.0f);
 		configure_stream_local("NAMED_VALUE_FLOAT", 50.0f);
 		configure_stream_local("NAV_CONTROLLER_OUTPUT", 10.0f);

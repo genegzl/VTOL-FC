@@ -570,6 +570,7 @@ MulticopterAttitudeControl::control_attitude()
 	const float yaw_w = math::constrain(attitude_gain(2) / roll_pitch_gain, 0.f, 1.f);
 	attitude_gain(2) = roll_pitch_gain;
 
+
 	/* get estimated and desired vehicle attitude */
 	Quatf q(_v_att.q);
 	Quatf qd(_v_att_sp.q_d);
@@ -810,6 +811,8 @@ MulticopterAttitudeControl::control_attitude_rates(float dt)
 	_rates_prev = rates;
 	_rates_prev_filtered = rates_filtered;
 
+	
+
 	/* update integral only if we are not landed */
 	if (!_vehicle_land_detected.maybe_landed && !_vehicle_land_detected.landed) {
 		for (int i = AXIS_INDEX_ROLL; i < AXIS_COUNT; i++) {
@@ -887,7 +890,10 @@ MulticopterAttitudeControl::publish_actuator_controls()
 	_actuators.control[1] = (PX4_ISFINITE(_att_control(1))) ? _att_control(1) : 0.0f;
 	_actuators.control[2] = (PX4_ISFINITE(_att_control(2))) ? _att_control(2) : 0.0f;
 	_actuators.control[3] = (PX4_ISFINITE(_thrust_sp)) ? _thrust_sp : 0.0f;
-	_actuators.control[7] = (float)_landing_gear.landing_gear;
+	_actuators.control[4] = 0.0f;//(float)rates_p_scaled_debug(0);
+	_actuators.control[5] = 0.0f;//(float)rates_i_scaled_debug(0);//(float)_manual_control_sp.gear_switch;
+	_actuators.control[6] = 0.0f;//(float)rates_d_scaled_debug(0);
+	_actuators.control[7] = 0.0f;//(float)attitude_gain_debug(0);//(float)_landing_gear.landing_gear;
 	_actuators.timestamp = hrt_absolute_time();
 	_actuators.timestamp_sample = _sensor_gyro.timestamp;
 
